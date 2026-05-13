@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Download Manager</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="src/styles/style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="header"></header>
+    <div id="main-layout">
+      <aside id="sidebar"></aside>
+      <main id="content">
+        <div id="toolbar"></div>
+        <div id="stats-panel"></div>
+        <div id="download-list"></div>
+      </main>
+    </div>
+  </div>
+
+  <div id="add-url-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-plus"></i> Add Download</h2>
+        <button class="modal-close" id="modal-close"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <label for="url-input">URL(s)</label>
+        <textarea id="url-input" rows="5" placeholder="Paste one or multiple URLs here (one per line)"></textarea>
+        <div id="url-error" class="error-msg hidden"></div>
+        <label for="filename-input">Custom Filenames (optional, one per line, matching URL order)</label>
+        <textarea id="filename-input" rows="3" placeholder="Leave blank to auto-detect filenames"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="modal-confirm"><i class="fas fa-download"></i> Add to Queue</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2><i class="fas fa-gear"></i> Settings</h2>
+        <button class="modal-close" id="settings-close"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label for="setting-concurrent">Max Concurrent Downloads</label>
+          <input type="number" id="setting-concurrent" min="1" max="10" value="3">
+        </div>
+        <div class="setting-group">
+          <label for="setting-speed-limit">Global Speed Limit (KB/s, 0 = unlimited)</label>
+          <input type="number" id="setting-speed-limit" min="0" value="0">
+        </div>
+        <div class="setting-group">
+          <label for="setting-theme">Theme</label>
+          <select id="setting-theme">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="settings-cancel">Cancel</button>
+        <button class="btn btn-primary" id="settings-save"><i class="fas fa-save"></i> Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
