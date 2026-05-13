@@ -1,0 +1,12 @@
+services:
+  download-manager:
+    build: .
+    container_name: idm-download-manager
+    restart: always
+    ports:
+      - "8080:8080"
+    volumes:
+      - /idm/downloads:/app/downloads
+    environment:
+      - PORT=8080
+      - DOWNLOAD_PATH=./downloads
