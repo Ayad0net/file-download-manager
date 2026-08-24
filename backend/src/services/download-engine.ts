@@ -38,6 +38,82 @@ const DOWNLOADS_DIR = path.resolve(process.cwd(), 'downloads');
 
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECTS = 5;
+
+interface RequestConfig {
+  method: string;
+  headers: Record<string, string>;
+  timeout?: number;
+  onRequest?: (req: http.ClientRequest) => void;
+}
+
+interface FinalResponse {
+  req: http.ClientRequest;
+  res: http.IncomingMessage;
+}
+
+function requestWithRedirects(urlStr: string, options: RequestConfig): Promise<FinalResponse> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (!settled) {
+        settled = true;
+        fn();
+      }
+    };
+
+    const attempt = (currentUrl: URL, remaining: number): void => {
+      const httpModule = currentUrl.protocol === 'https:' ? https : http;
+      const req = httpModule.request(
+        {
+          hostname: currentUrl.hostname,
+          port: currentUrl.port || (currentUrl.protocol === 'https:' ? 443 : 80),
+          path: currentUrl.pathname + currentUrl.search,
+          method: options.method,
+          headers: options.headers,
+          timeout: options.timeout,
+        },
+        (res) => {
+          const status = res.statusCode || 0;
+          const location = res.headers.location;
+
+          if (REDIRECT_STATUSES.has(status) && location) {
+            res.resume();
+            if (remaining <= 0) {
+              settle(() => reject(new Error(`HTTP ${status}: too many redirects`)));
+              return;
+            }
+            try {
+              attempt(new URL(location, currentUrl), remaining - 1);
+            } catch (err: any) {
+              settle(() => reject(new Error(`Invalid redirect location: ${location}`)));
+            }
+            return;
+          }
+
+          settle(() => resolve({ req, res }));
+        }
+      );
+
+      req.on('error', (err) => settle(() => reject(err)));
+      req.on('timeout', () => {
+        req.destroy();
+        settle(() => reject(new Error('Request timeout')));
+      });
+
+      options.onRequest?.(req);
+      req.end();
+    };
+
+    try {
+      attempt(new URL(urlStr), MAX_REDIRECTS);
+    } catch (err: any) {
+      settle(() => reject(err));
+    }
+  });
+}
+
 function sanitizeFilename(name: string): string {
   return name.replace(/[<>:"/\\|?*]/g, '_').substring(0, 255);
 }
@@ -59,59 +135,39 @@ function getDestPath(downloadId: string, filename: string, partial: boolean = fa
 }
 
 export async function getFileSize(urlStr: string): Promise<number | null> {
-  return new Promise((resolve) => {
-    const url = new URL(urlStr);
-    const httpModule = url.protocol === 'https:' ? https : http;
-    const options: http.RequestOptions = {
-      hostname: url.hostname,
-      port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      path: url.pathname + url.search,
+  try {
+    const { res } = await requestWithRedirects(urlStr, {
       method: 'HEAD',
       headers: { 'User-Agent': 'WebDownloadManager/1.0' },
       timeout: 10000,
-    };
-
-    const req = httpModule.request(options, (res) => {
-      const size = parseInt(res.headers['content-length'] || '0', 10);
-      res.resume();
-      resolve(size || null);
     });
-
-    req.on('error', () => resolve(null));
-    req.on('timeout', () => { req.destroy(); resolve(null); });
-    req.end();
-  });
+    const size = parseInt(res.headers['content-length'] || '0', 10);
+    res.resume();
+    return size || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function probeUrl(urlStr: string): Promise<{ filename: string; size: number | null; supportsResume: boolean }> {
-  return new Promise((resolve) => {
-    const url = new URL(urlStr);
-    const httpModule = url.protocol === 'https:' ? https : http;
-    const options: http.RequestOptions = {
-      hostname: url.hostname,
-      port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      path: url.pathname + url.search,
+  try {
+    const { res } = await requestWithRedirects(urlStr, {
       method: 'HEAD',
       headers: { 'User-Agent': 'WebDownloadManager/1.0' },
       timeout: 10000,
-    };
-
-    const req = httpModule.request(options, (res) => {
-      const size = parseInt(res.headers['content-length'] || '0', 10);
-      let filename = getFilenameFromUrl(urlStr);
-      const cd = res.headers['content-disposition'];
-      if (cd) {
-        const match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (match) filename = sanitizeFilename(match[1].replace(/['"]/g, ''));
-      }
-      res.resume();
-      resolve({ filename, size: size || null, supportsResume: false });
     });
-
-    req.on('error', () => resolve({ filename: getFilenameFromUrl(urlStr), size: null, supportsResume: false }));
-    req.on('timeout', () => { req.destroy(); resolve({ filename: getFilenameFromUrl(urlStr), size: null, supportsResume: false }); });
-    req.end();
-  });
+    const size = parseInt(res.headers['content-length'] || '0', 10);
+    let filename = getFilenameFromUrl(urlStr);
+    const cd = res.headers['content-disposition'];
+    if (cd) {
+      const match = cd.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match) filename = sanitizeFilename(match[1].replace(/['"]/g, ''));
+    }
+    res.resume();
+    return { filename, size: size || null, supportsResume: false };
+  } catch {
+    return { filename: getFilenameFromUrl(urlStr), size: null, supportsResume: false };
+  }
 }
 
 export async function startDownload(
@@ -122,8 +178,6 @@ export async function startDownload(
 ): Promise<void> {
   if (activeDownloads.has(downloadId)) return;
 
-  const url = new URL(urlStr);
-  const httpModule = url.protocol === 'https:' ? https : http;
   const filename = getFilenameFromUrl(urlStr);
   const partPath = getDestPath(downloadId, filename, true);
   const finalPath = getDestPath(downloadId, filename, false);
@@ -159,16 +213,13 @@ export async function startDownload(
   activeDownloads.set(downloadId, active);
 
   return new Promise((resolve, reject) => {
-    const options: http.RequestOptions = {
-      hostname: url.hostname,
-      port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      path: url.pathname + url.search,
+    requestWithRedirects(urlStr, {
       method: 'GET',
       headers,
       timeout: 30000,
-    };
-
-    const req = httpModule.request(options, (res) => {
+      onRequest: (r) => { active.req = r; },
+    })
+      .then(({ req, res }) => {
       if (res.statusCode !== 206 && res.statusCode !== 200) {
         res.resume();
         activeDownloads.delete(downloadId);
@@ -253,23 +304,14 @@ export async function startDownload(
         activeDownloads.delete(downloadId);
         reject(err);
       });
-    });
-
-    req.on('error', (err) => {
-      if (speedTimer) clearInterval(speedTimer);
-      activeDownloads.delete(downloadId);
-      reject(err);
-    });
-
-    req.on('timeout', () => {
-      req.destroy();
-      if (speedTimer) clearInterval(speedTimer);
-      activeDownloads.delete(downloadId);
-      reject(new Error('Request timeout'));
-    });
-
-    active.req = req;
-    req.end();
+      })
+      .catch((err) => {
+        if (speedTimer) clearInterval(speedTimer);
+        if (!active.finished && !active.aborted) {
+          activeDownloads.delete(downloadId);
+          reject(err);
+        }
+      });
   });
 }
 
