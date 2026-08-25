@@ -9,7 +9,7 @@ export function renderToolbar(container) {
   const uncompletedCount = store.downloads.filter(d => d.status !== 'completed').length;
 
   container.innerHTML = `
-    <button class="btn btn-primary" id="toolbar-add"><i class="fas fa-plus"></i> Add URL</button>
+    <button class="btn btn-primary" id="toolbar-add" title="Add a new download URL"><i class="fas fa-plus"></i> Add URL</button>
     <button class="btn" id="toolbar-pause-all" ${hasActive ? '' : 'disabled'} title="${hasActive ? 'Pause every active download' : 'No active downloads'}"><i class="fas fa-pause"></i> Pause All</button>
     <button class="btn" id="toolbar-resume-all" ${hasPaused ? '' : 'disabled'} title="${hasPaused ? 'Resume every paused download' : 'No paused downloads'}"><i class="fas fa-play"></i> Resume All</button>
     <button class="btn" id="toolbar-stop-all" ${hasActive ? '' : 'disabled'} title="${hasActive ? 'Stop every active download' : 'No active downloads'}"><i class="fas fa-stop"></i> Stop All</button>

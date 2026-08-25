@@ -943,7 +943,19 @@ body {
   }
 
   #toolbar {
-    gap: 4px;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  #toolbar .btn {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 0;
+    font-size: 0;
+  }
+
+  #toolbar .btn i {
+    font-size: 0.95rem;
   }
 
   #speed-control input {
