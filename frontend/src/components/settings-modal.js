@@ -11,9 +11,19 @@ const ACCENTS = [
   { value: 'teal', name: 'Teal', color: '#14b8a6' },
 ];
 
+const THEME_FADE_MS = 350;
+
 export function applyTheme(mode, accent) {
-  document.documentElement.setAttribute('data-mode', mode);
-  document.documentElement.setAttribute('data-accent', accent || 'blue');
+  const root = document.documentElement;
+  if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+    root.classList.add('theme-transition');
+    clearTimeout(applyTheme._fadeTimer);
+    applyTheme._fadeTimer = setTimeout(() => {
+      root.classList.remove('theme-transition');
+    }, THEME_FADE_MS);
+  }
+  root.setAttribute('data-mode', mode);
+  root.setAttribute('data-accent', accent || 'blue');
   localStorage.setItem('dm-mode', mode);
   localStorage.setItem('dm-accent', accent || 'blue');
   const icon = document.getElementById('header-theme-btn')?.querySelector('i');
