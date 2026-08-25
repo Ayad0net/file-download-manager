@@ -93,7 +93,7 @@ export async function stopAll() {
   return res.json();
 }
 
-export async function clearCompleted() {
-  const res = await fetch(`${API_BASE}/actions/clear-completed`, { method: 'POST' });
+export async function clearUncompleted() {
+  const res = await fetch(`${API_BASE}/actions/clear-uncompleted`, { method: 'POST' });
   return res.json();
 }

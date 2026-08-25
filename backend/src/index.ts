@@ -40,8 +40,8 @@ async function main() {
     return c.json({ success: true });
   });
 
-  app.post('/api/actions/clear-completed', (c) => {
-    queueManager.clearCompleted();
+  app.post('/api/actions/clear-uncompleted', (c) => {
+    queueManager.removeUncompleted();
     return c.json({ success: true });
   });
 

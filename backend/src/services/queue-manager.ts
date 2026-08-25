@@ -35,6 +35,7 @@ class QueueManager {
   private activeCount: number = 0;
   private progressHandlers: ProgressHandler[] = [];
   private downloadInProgress: Set<string> = new Set();
+  private removedIds: Set<string> = new Set();
 
   constructor() {}
 
@@ -167,6 +168,8 @@ class QueueManager {
 
   private async beginDownload(record: DownloadRecord): Promise<void> {
     const db = getDb();
+    if (this.removedIds.has(record.id) || !this.getById(record.id)) return;
+
     this.downloadInProgress.add(record.id);
 
     db.run(`UPDATE downloads SET status = 'connecting' WHERE id = ?`, [record.id]);
@@ -174,6 +177,13 @@ class QueueManager {
 
     const size = await getFileSize(record.url);
     const downloadedBytes = record.downloadedBytes || 0;
+
+    if (this.removedIds.has(record.id) || !this.getById(record.id)) {
+      this.cleanupFiles(record.id, record.filename);
+      this.downloadInProgress.delete(record.id);
+      this.processQueue();
+      return;
+    }
 
     if (size !== null && size > 0 && downloadedBytes >= size) {
       db.run(
@@ -200,6 +210,10 @@ class QueueManager {
       );
 
       const finalBytes = size && size > 0 ? size : (downloadedBytes || 0);
+      if (this.removedIds.has(record.id) || !this.getById(record.id)) {
+        this.cleanupFiles(record.id, record.filename);
+        return;
+      }
       const statusCheck = db.exec(`SELECT status FROM downloads WHERE id = ?`, [record.id]);
       const currentStatus = statusCheck.length > 0 && statusCheck[0].values.length > 0
         ? statusCheck[0].values[0][0] as string : '';
@@ -215,6 +229,10 @@ class QueueManager {
       );
       save();
     } catch (err: any) {
+      if (this.removedIds.has(record.id) || !this.getById(record.id)) {
+        this.cleanupFiles(record.id, record.filename);
+        return;
+      }
       const current = db.exec(`SELECT status FROM downloads WHERE id = ?`, [record.id]);
       const currentStatus = current.length > 0 && current[0].values.length > 0
         ? current[0].values[0][0] as string : '';
@@ -276,19 +294,32 @@ class QueueManager {
 
   remove(id: string): void {
     const db = getDb();
+    this.removedIds.add(id);
     stopDownload(id);
 
     const result = db.exec(`SELECT filename FROM downloads WHERE id = ?`, [id]);
     if (result.length > 0 && result[0].values.length > 0) {
       const filename = result[0].values[0][0] as string;
-      const partPath = path.join(DOWNLOADS_DIR, `${id}_${filename}.part`);
-      const finalPath = path.join(DOWNLOADS_DIR, `${id}_${filename}`);
-      try { if (fs.existsSync(partPath)) fs.unlinkSync(partPath); } catch {}
-      try { if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath); } catch {}
+      this.cleanupFiles(id, filename);
     }
 
     db.run(`DELETE FROM downloads WHERE id = ?`, [id]);
     save();
+  }
+
+  private cleanupFiles(id: string, filename: string): void {
+    const partPath = path.join(DOWNLOADS_DIR, `${id}_${filename}.part`);
+    const finalPath = path.join(DOWNLOADS_DIR, `${id}_${filename}`);
+    try { if (fs.existsSync(partPath)) fs.unlinkSync(partPath); } catch {}
+    try { if (fs.existsSync(finalPath)) fs.unlinkSync(finalPath); } catch {}
+  }
+
+  removeUncompleted(): void {
+    for (const record of this.getAll()) {
+      if (record.status !== 'completed') {
+        this.remove(record.id);
+      }
+    }
   }
 
   retry(id: string): void {
@@ -326,12 +357,6 @@ class QueueManager {
     const result = db.exec(`SELECT * FROM downloads WHERE id = ?`, [id]);
     if (result.length === 0 || result[0].values.length === 0) return null;
     return this.rowToRecord(result[0].columns, result[0].values[0]);
-  }
-
-  clearCompleted(): void {
-    const db = getDb();
-    db.run(`DELETE FROM downloads WHERE status = 'completed'`);
-    save();
   }
 
   pauseAll(): void {
