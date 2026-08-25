@@ -1,6 +1,8 @@
 import { store } from '../state/store.js';
+import { toggleTheme } from './settings-modal.js';
 
 export function renderHeader(container) {
+  const isDark = (document.documentElement.getAttribute('data-mode') || 'dark') === 'dark';
   container.innerHTML = `
     <button id="sidebar-toggle"><i class="fas fa-bars"></i></button>
     <div class="header-logo">
@@ -10,7 +12,7 @@ export function renderHeader(container) {
     <div class="header-spacer"></div>
     <div class="header-controls">
       <button class="btn btn-icon" id="header-settings-btn" title="Settings"><i class="fas fa-gear"></i></button>
-      <button class="btn btn-icon" id="header-theme-btn" title="Toggle Theme"><i class="fas fa-moon"></i></button>
+      <button class="btn btn-icon" id="header-theme-btn" title="Toggle Theme"><i class="fas fa-${isDark ? 'moon' : 'sun'}"></i></button>
     </div>
   `;
 
@@ -19,18 +21,10 @@ export function renderHeader(container) {
   };
 
   document.getElementById('header-settings-btn').onclick = () => {
-    const modal = document.getElementById('settings-modal');
-    document.getElementById('setting-concurrent').value = store.maxConcurrent;
-    document.getElementById('setting-speed-limit').value = store.globalSpeedLimit;
-    document.getElementById('setting-theme').value = document.documentElement.getAttribute('data-theme') || 'dark';
-    modal.classList.remove('hidden');
+    window.openSettings();
   };
 
   document.getElementById('header-theme-btn').onclick = () => {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    const icon = document.getElementById('header-theme-btn').querySelector('i');
-    icon.className = next === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+    toggleTheme();
   };
 }
