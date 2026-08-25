@@ -139,15 +139,75 @@ body {
 .header-logo {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--accent-blue);
+  gap: 12px;
   white-space: nowrap;
+  user-select: none;
 }
 
-.header-logo i {
-  font-size: 1.3rem;
+.logo-mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, var(--accent-blue) 0%, color-mix(in srgb, var(--accent-blue) 55%, #8b5cf6) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 12px color-mix(in srgb, var(--accent-blue) 35%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.logo-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.3), transparent 60%);
+  pointer-events: none;
+}
+
+.logo-mark i {
+  font-size: 0.95rem;
+  color: #fff;
+  transform: translateY(-1px);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.logo-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.logo-title em {
+  font-style: normal;
+  font-weight: 600;
+  background: linear-gradient(90deg, var(--accent-blue), color-mix(in srgb, var(--accent-blue) 55%, #8b5cf6));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.logo-version {
+  margin-top: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 25%, transparent);
+  padding: 1px 7px;
+  border-radius: 999px;
+  width: fit-content;
 }
 
 .header-spacer {
@@ -818,11 +878,25 @@ body {
   }
 
   .header-logo {
+    gap: 10px;
+  }
+
+  .logo-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  .logo-mark i {
+    font-size: 0.8rem;
+  }
+
+  .logo-title {
     font-size: 1rem;
   }
 
-  .header-logo i {
-    font-size: 1.1rem;
+  .logo-version {
+    display: none;
   }
 }
 

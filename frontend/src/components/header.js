@@ -1,13 +1,20 @@
 import { store } from '../state/store.js';
 import { toggleTheme } from './settings-modal.js';
 
+const APP_VERSION = 'v1.0.0';
+
 export function renderHeader(container) {
   const isDark = (document.documentElement.getAttribute('data-mode') || 'dark') === 'dark';
   container.innerHTML = `
     <button id="sidebar-toggle"><i class="fas fa-bars"></i></button>
     <div class="header-logo">
-      <i class="fas fa-download"></i>
-      <span>Download Manager</span>
+      <div class="logo-mark">
+        <i class="fas fa-arrow-down"></i>
+      </div>
+      <div class="logo-text">
+        <span class="logo-title">Download<em>Manager</em></span>
+        <span class="logo-version">${APP_VERSION}</span>
+      </div>
     </div>
     <div class="header-spacer"></div>
     <div class="header-controls">
