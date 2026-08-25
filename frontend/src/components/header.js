@@ -5,7 +5,7 @@ export function renderHeader(container) {
     <button id="sidebar-toggle"><i class="fas fa-bars"></i></button>
     <div class="header-logo">
       <i class="fas fa-download"></i>
-      <span>Web Download Manager</span>
+      <span>Download Manager</span>
     </div>
     <div class="header-spacer"></div>
     <div class="header-controls">

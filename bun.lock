@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "web-download-manager",
+      "name": "download-manager",
       "dependencies": {
         "hono": "^4.7.0",
         "sql.js": "^1.11.0",

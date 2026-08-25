@@ -60,7 +60,7 @@ async function main() {
 
   const port = parseInt(process.env.PORT || '8080', 10);
 
-  console.log(`Web Download Manager starting on http://localhost:${port}`);
+  console.log(`Download Manager starting on http://localhost:${port}`);
 
   Bun.serve({
     fetch: app.fetch,

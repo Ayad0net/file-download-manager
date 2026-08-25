@@ -1,5 +1,5 @@
 {
-  "name": "web-download-manager",
+  "name": "download-manager",
   "version": "1.0.0",
   "description": "Web-based file download manager",
   "type": "module",

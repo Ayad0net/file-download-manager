@@ -6,7 +6,7 @@
 # 1. Product Overview
 
 ## Product Name
-Web Download Manager (Working Title)
+Download Manager
 
 ## Product Vision
 A responsive browser-based download manager that allows users to add downloadable files through pasted URLs, manage download queues, pause/resume/stop downloads, limit bandwidth usage, and monitor progress through a modern UI.

@@ -138,7 +138,7 @@ export async function getFileSize(urlStr: string): Promise<number | null> {
   try {
     const { res } = await requestWithRedirects(urlStr, {
       method: 'HEAD',
-      headers: { 'User-Agent': 'WebDownloadManager/1.0' },
+      headers: { 'User-Agent': 'DownloadManager/1.0' },
       timeout: 10000,
     });
     const size = parseInt(res.headers['content-length'] || '0', 10);
@@ -153,7 +153,7 @@ export async function probeUrl(urlStr: string): Promise<{ filename: string; size
   try {
     const { res } = await requestWithRedirects(urlStr, {
       method: 'HEAD',
-      headers: { 'User-Agent': 'WebDownloadManager/1.0' },
+      headers: { 'User-Agent': 'DownloadManager/1.0' },
       timeout: 10000,
     });
     const size = parseInt(res.headers['content-length'] || '0', 10);
@@ -184,7 +184,7 @@ export async function startDownload(
 
   const startByte = existingBytes;
   const headers: Record<string, string> = {
-    'User-Agent': 'WebDownloadManager/1.0',
+    'User-Agent': 'DownloadManager/1.0',
   };
 
   if (startByte > 0) {
