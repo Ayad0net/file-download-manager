@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
-import { queueManager } from '../services/queue-manager.js';
+import path from 'path';
+import fs from 'fs';
+import { queueManager, DOWNLOADS_DIR } from '../services/queue-manager.js';
 
 const downloadsApi = new Hono();
 
@@ -82,6 +84,39 @@ downloadsApi.delete('/:id', (c) => {
   const id = c.req.param('id');
   queueManager.remove(id);
   return c.json({ success: true });
+});
+
+function buildContentDisposition(filename: string): string {
+  const asciiFallback = filename.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, "'");
+  const encoded = encodeURIComponent(filename);
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
+}
+
+downloadsApi.get('/:id/file', (c) => {
+  const id = c.req.param('id');
+  const record = queueManager.getById(id);
+
+  if (!record) {
+    return c.json({ error: 'Download not found' }, 404);
+  }
+  if (record.status !== 'completed') {
+    return c.json({ error: 'Download is not completed yet' }, 409);
+  }
+
+  const filePath = path.join(DOWNLOADS_DIR, `${id}_${record.filename}`);
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return c.json({ error: 'File no longer exists on the server' }, 404);
+  }
+
+  const stat = fs.statSync(filePath);
+  return new Response(Bun.file(filePath), {
+    headers: {
+      'Content-Type': 'application/octet-stream',
+      'Content-Length': String(stat.size),
+      'Content-Disposition': buildContentDisposition(record.filename),
+      'Cache-Control': 'no-store',
+    },
+  });
 });
 
 export { downloadsApi };

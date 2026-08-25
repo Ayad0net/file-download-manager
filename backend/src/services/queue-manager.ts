@@ -27,7 +27,7 @@ export interface DownloadRecord {
 
 type ProgressHandler = (downloadId: string, progress: DownloadProgress) => void;
 
-const DOWNLOADS_DIR = path.resolve(process.cwd(), 'downloads');
+export const DOWNLOADS_DIR = path.resolve(process.cwd(), 'downloads');
 
 class QueueManager {
   private maxConcurrent: number = 3;

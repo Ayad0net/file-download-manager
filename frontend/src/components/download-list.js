@@ -68,6 +68,8 @@ function renderDownloadItem(d) {
     actions.push(`<button class="btn btn-sm btn-icon action-pause" data-id="${d.id}" title="Pause"><i class="fas fa-pause"></i></button>`);
   } else if (status === 'failed' || status === 'stopped') {
     actions.push(`<button class="btn btn-sm btn-icon action-retry" data-id="${d.id}" title="Retry"><i class="fas fa-rotate-right"></i></button>`);
+  } else if (status === 'completed') {
+    actions.push(`<a class="btn btn-sm btn-icon action-save" href="/api/downloads/${d.id}/file" download title="Save to PC"><i class="fas fa-download"></i></a>`);
   }
   if (status !== 'downloading' && status !== 'connecting') {
     actions.push(`<button class="btn btn-sm btn-icon btn-danger-ghost action-delete" data-id="${d.id}" title="Delete"><i class="fas fa-trash"></i></button>`);
