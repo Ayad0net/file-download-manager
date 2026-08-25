@@ -1,7 +1,7 @@
 class Store {
   constructor() {
     this.downloads = [];
-    this.stats = { total: 0, active: 0, completed: 0, failed: 0, paused: 0, queued: 0 };
+    this.stats = { total: 0, active: 0, completed: 0, failed: 0, paused: 0, queued: 0, totalDownloadedBytes: 0, freeDiskBytes: null };
     this.globalSpeedLimit = 0;
     this.maxConcurrent = 3;
     this.filter = 'all';

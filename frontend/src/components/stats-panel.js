@@ -23,7 +23,18 @@ export function renderStatsPanel(container) {
       <div class="stat-value">${stats.paused || 0}</div>
       <div class="stat-label"><i class="fas fa-pause"></i> Paused</div>
     </div>
+    <div class="stat-card stat-storage">
+      <div class="stat-value">${formatBytes(stats.totalDownloadedBytes)} <span class="stat-div">/</span> ${stats.freeDiskBytes != null ? formatBytes(stats.freeDiskBytes) : '--'}</div>
+      <div class="stat-label"><i class="fas fa-hard-drive"></i> Downloaded / Free Space</div>
+    </div>
   `;
+}
+
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
 }
 
 store.subscribe(() => {

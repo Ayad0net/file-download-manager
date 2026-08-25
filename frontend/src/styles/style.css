@@ -228,6 +228,14 @@ body {
 .stat-card.stat-completed .stat-value { color: var(--accent-green); }
 .stat-card.stat-failed .stat-value { color: var(--accent-red); }
 .stat-card.stat-paused .stat-value { color: var(--accent-yellow); }
+.stat-card.stat-storage .stat-value {
+  font-size: 1.05rem;
+  line-height: 2;
+}
+.stat-card.stat-storage .stat-div {
+  color: var(--text-muted);
+  font-weight: 400;
+}
 .stat-card.stat-queued .stat-value { color: var(--text-secondary); }
 
 .btn {
@@ -708,6 +716,33 @@ body {
   to { transform: translateX(0); opacity: 1; }
 }
 
+#footer {
+  text-align: center;
+  padding: 18px 16px 22px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+#footer strong {
+  color: var(--text-secondary);
+}
+
+#footer .fa-heart {
+  color: var(--accent-red);
+  display: inline-block;
+  animation: heartbeat 1.4s ease-in-out infinite;
+  transform-origin: center;
+  margin: 0 2px;
+}
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  15% { transform: scale(1.3); }
+  30% { transform: scale(1); }
+  45% { transform: scale(1.2); }
+  60% { transform: scale(1); }
+}
+
 @media (max-width: 768px) {
   #sidebar {
     transform: translateX(-100%);
@@ -749,8 +784,12 @@ body {
     margin-top: 8px;
   }
 
-  .header-logo span {
-    display: none;
+  .header-logo {
+    font-size: 1rem;
+  }
+
+  .header-logo i {
+    font-size: 1.1rem;
   }
 }
 

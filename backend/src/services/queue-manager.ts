@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 import { getDb, save } from '../database/db.js';
 import {
   startDownload, pauseDownload, stopDownload, probeUrl,
@@ -372,13 +373,14 @@ class QueueManager {
     }
   }
 
-  getStats(): { total: number; active: number; completed: number; failed: number; paused: number; queued: number } {
+  getStats(): { total: number; active: number; completed: number; failed: number; paused: number; queued: number; totalDownloadedBytes: number; freeDiskBytes: number | null } {
     const db = getDb();
     const count = (status: string) => {
       const r = db.exec(`SELECT COUNT(*) as c FROM downloads WHERE status = ?`, [status]);
       return r.length > 0 && r[0].values.length > 0 ? (r[0].values[0][0] as number) : 0;
     };
     const totalResult = db.exec(`SELECT COUNT(*) as c FROM downloads`);
+    const downloadedResult = db.exec(`SELECT COALESCE(SUM(downloaded_bytes), 0) FROM downloads WHERE status = 'completed'`);
     return {
       total: totalResult.length > 0 ? (totalResult[0].values[0][0] as number) : 0,
       active: count('downloading'),
@@ -386,7 +388,20 @@ class QueueManager {
       failed: count('failed'),
       paused: count('paused'),
       queued: count('queued'),
+      totalDownloadedBytes: downloadedResult.length > 0 ? (downloadedResult[0].values[0][0] as number) : 0,
+      freeDiskBytes: this.getFreeDiskBytes(),
     };
+  }
+
+  private getFreeDiskBytes(): number | null {
+    try {
+      const out = execSync(`df -Pk "${DOWNLOADS_DIR}"`).toString().trim().split('\n');
+      const cols = out[out.length - 1].split(/\s+/);
+      const availKb = parseInt(cols[3], 10);
+      return Number.isFinite(availKb) && availKb >= 0 ? availKb * 1024 : null;
+    } catch {
+      return null;
+    }
   }
 
   private rowToRecord(columns: string[], row: any[]): DownloadRecord {
