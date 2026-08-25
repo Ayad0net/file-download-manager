@@ -6,6 +6,7 @@ import { renderStatsPanel } from './components/stats-panel.js';
 import { renderDownloadList } from './components/download-list.js';
 import { initAddUrlModal } from './components/add-url-modal.js';
 import { initSettingsModal } from './components/settings-modal.js';
+import { initDeleteConfirmModal } from './components/delete-confirm-modal.js';
 
 function init() {
   renderHeader(document.getElementById('header'));
@@ -16,6 +17,7 @@ function init() {
 
   initAddUrlModal();
   initSettingsModal();
+  initDeleteConfirmModal();
 
   store.startPolling(1500);
 }

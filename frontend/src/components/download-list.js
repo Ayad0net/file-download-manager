@@ -1,4 +1,4 @@
-import { pauseDownload, resumeDownload, stopDownload, retryDownload, deleteDownload } from '../services/api.js';
+import { pauseDownload, resumeDownload, stopDownload, retryDownload } from '../services/api.js';
 import { store } from '../state/store.js';
 
 export function renderDownloadList(container) {
@@ -72,7 +72,7 @@ function renderDownloadItem(d) {
     actions.push(`<a class="btn btn-sm btn-icon action-save" href="/api/downloads/${d.id}/file" download title="Save to PC"><i class="fas fa-download"></i></a>`);
   }
   if (status !== 'downloading' && status !== 'connecting') {
-    actions.push(`<button class="btn btn-sm btn-icon btn-danger-ghost action-delete" data-id="${d.id}" title="Delete"><i class="fas fa-trash"></i></button>`);
+    actions.push(`<button class="btn btn-sm btn-icon btn-danger-soft action-delete" data-id="${d.id}" title="Delete"><i class="fas fa-trash"></i></button>`);
   }
 
   const progressClass = status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : '';
@@ -140,9 +140,8 @@ document.addEventListener('click', async (e) => {
     await retryDownload(id);
   } else if (btn.classList.contains('action-delete')) {
     e.stopPropagation();
-    if (confirm('Delete this download entry?')) {
-      await deleteDownload(id);
-    }
+    const record = store.downloads.find(d => d.id === id);
+    window.openDeleteConfirm(id, record ? record.filename : 'this download');
   }
 });
 

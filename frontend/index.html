@@ -70,6 +70,21 @@
     </div>
   </div>
 
+  <div id="delete-confirm-modal" class="modal-overlay hidden">
+    <div class="modal confirm-modal">
+      <div class="confirm-icon"><i class="fas fa-trash-can"></i></div>
+      <div class="modal-body">
+        <h3 class="confirm-title">Delete this download?</h3>
+        <p class="confirm-text">You're about to permanently remove <strong id="delete-confirm-filename"></strong> along with its file from the server.</p>
+        <p class="confirm-warning"><i class="fas fa-triangle-exclamation"></i> This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer confirm-footer">
+        <button class="btn" id="delete-cancel">Cancel</button>
+        <button class="btn btn-danger" id="delete-confirm-btn"><i class="fas fa-trash"></i> Yes, Delete</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast-container"></div>
 
   <script type="module" src="src/app.js"></script>
