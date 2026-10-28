@@ -1,8 +1,12 @@
 import initSqlJs, { Database as SqlJsDatabase } from 'sql.js';
 import fs from 'fs';
 import path from 'path';
+import { markChanged } from '../services/change-notifier.js';
+// Embedded into the binary by `bun build --compile`; resolves to node_modules in dev.
+import wasmPath from 'sql.js/dist/sql-wasm.wasm' with { type: 'file' };
 
-const DB_PATH = path.resolve(import.meta.dir, '..', '..', '..', 'data', 'downloads.db');
+const DATA_DIR = process.env.DATA_DIR || path.resolve(import.meta.dir, '..', '..', '..', 'data');
+const DB_PATH = path.join(DATA_DIR, 'downloads.db');
 
 let db: SqlJsDatabase;
 
@@ -10,7 +14,7 @@ export async function initDatabase(): Promise<SqlJsDatabase> {
   const dir = path.dirname(DB_PATH);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  const SQL = await initSqlJs();
+  const SQL = await initSqlJs({ locateFile: () => wasmPath });
   if (fs.existsSync(DB_PATH)) {
     const buffer = fs.readFileSync(DB_PATH);
     db = new SQL.Database(buffer);
@@ -54,6 +58,7 @@ export function getDb(): SqlJsDatabase {
 
 export function save(): void {
   if (!db) return;
+  markChanged();
   const data = db.export();
   const buffer = Buffer.from(data);
   const dir = path.dirname(DB_PATH);

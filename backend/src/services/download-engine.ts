@@ -28,13 +28,14 @@ interface ActiveDownload {
   totalBytes: number | null;
   startTime: number;
   lastSpeedTime: number;
+  lastEmitTime: number;
   lastSpeedBytes: number;
   speed: number;
   progressCallback: DownloadEventCallback | null;
 }
 
 const activeDownloads = new Map<string, ActiveDownload>();
-const DOWNLOADS_DIR = path.resolve(process.cwd(), 'downloads');
+const DOWNLOADS_DIR = path.resolve(process.env.DOWNLOAD_PATH || path.join(process.cwd(), 'downloads'));
 
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
@@ -205,6 +206,7 @@ export async function startDownload(
     totalBytes: null,
     startTime: Date.now(),
     lastSpeedTime: Date.now(),
+    lastEmitTime: 0,
     lastSpeedBytes: startByte,
     speed: 0,
     progressCallback,
@@ -255,7 +257,11 @@ export async function startDownload(
           active.lastSpeedBytes = active.downloadedBytes;
         }
 
-        emitProgress(active);
+        // Throttled: emitting per chunk persists the whole DB each time and starves the event loop.
+        if (now - active.lastEmitTime >= 250) {
+          active.lastEmitTime = now;
+          emitProgress(active);
+        }
 
         const delay = speedLimiter.getDelayMs(downloadId, chunk.length);
         if (delay > 5) {
@@ -269,6 +275,7 @@ export async function startDownload(
       });
 
       res.on('end', () => {
+        emitProgress(active);
         active.finished = true;
         if (speedTimer) clearInterval(speedTimer);
 

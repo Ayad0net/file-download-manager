@@ -4,6 +4,8 @@ import { toggleTheme } from './settings-modal.js';
 const APP_VERSION = 'v1.0.0';
 
 export function renderHeader(container) {
+  // Let the header act as the window's title bar in the desktop app.
+  container.setAttribute('data-tauri-drag-region', '');
   const isDark = (document.documentElement.getAttribute('data-mode') || 'dark') === 'dark';
   container.innerHTML = `
     <button id="sidebar-toggle"><i class="fas fa-bars"></i></button>
@@ -16,7 +18,7 @@ export function renderHeader(container) {
         <span class="logo-version">${APP_VERSION}</span>
       </div>
     </div>
-    <div class="header-spacer"></div>
+    <div class="header-spacer" data-tauri-drag-region></div>
     <div class="header-controls">
       <button class="btn btn-icon" id="header-settings-btn" title="Settings"><i class="fas fa-gear"></i></button>
       <button class="btn btn-icon" id="header-theme-btn" title="Toggle Theme"><i class="fas fa-${isDark ? 'moon' : 'sun'}"></i></button>

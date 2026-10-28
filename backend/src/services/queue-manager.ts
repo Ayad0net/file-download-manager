@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
+import { markChanged } from './change-notifier.js';
 import { getDb, save } from '../database/db.js';
 import {
   startDownload, pauseDownload, stopDownload, probeUrl,
@@ -28,7 +29,7 @@ export interface DownloadRecord {
 
 type ProgressHandler = (downloadId: string, progress: DownloadProgress) => void;
 
-export const DOWNLOADS_DIR = path.resolve(process.cwd(), 'downloads');
+export const DOWNLOADS_DIR = path.resolve(process.env.DOWNLOAD_PATH || path.join(process.cwd(), 'downloads'));
 
 class QueueManager {
   private maxConcurrent: number = 3;
@@ -104,7 +105,8 @@ class QueueManager {
         id,
       ]
     );
-    save();
+    // Not persisted here: progress is in-memory only; status transitions call save().
+    markChanged();
   }
 
   async addDownloads(urls: string[], customNames?: string[]): Promise<DownloadRecord[]> {
@@ -418,7 +420,18 @@ class QueueManager {
     };
   }
 
+  private freeDiskCache: { value: number | null; at: number } | null = null;
+
+  // Cached: spawning `df` synchronously on every poll blocks the server.
   private getFreeDiskBytes(): number | null {
+    const now = Date.now();
+    if (this.freeDiskCache && now - this.freeDiskCache.at < 10_000) return this.freeDiskCache.value;
+    const value = this.readFreeDiskBytes();
+    this.freeDiskCache = { value, at: now };
+    return value;
+  }
+
+  private readFreeDiskBytes(): number | null {
     try {
       const out = execSync(`df -Pk "${DOWNLOADS_DIR}"`).toString().trim().split('\n');
       const cols = out[out.length - 1].split(/\s+/);
@@ -445,7 +458,7 @@ class QueueManager {
       queueOrder: row[idx('queue_order')] as number,
       speedLimit: row[idx('speed_limit')] as number | null,
       errorMessage: row[idx('error_message')] as string | null,
-      filePath: row[idx('file_path')] as string | null,
+      filePath: (row[idx('file_path')] as string | null) || path.join(DOWNLOADS_DIR, `${row[idx('id')]}_${row[idx('filename')]}`),
     };
   }
 

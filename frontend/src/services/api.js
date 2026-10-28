@@ -1,4 +1,5 @@
-const API_BASE = '/api';
+// In the Tauri desktop app the backend runs as a sidecar on a fixed local port.
+export const API_BASE = window.__TAURI_INTERNALS__ ? 'http://127.0.0.1:17890/api' : '/api';
 
 export async function fetchDownloads() {
   const res = await fetch(`${API_BASE}/downloads`);

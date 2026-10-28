@@ -5,13 +5,16 @@ import { queueManager, DOWNLOADS_DIR } from '../services/queue-manager.js';
 
 const downloadsApi = new Hono();
 
-downloadsApi.get('/', (c) => {
-  const downloads = queueManager.getAll();
-  const stats = queueManager.getStats();
-  const globalSpeedLimit = queueManager.getGlobalSpeedLimit();
-  const maxConcurrent = queueManager.getMaxConcurrent();
-  return c.json({ downloads, stats, globalSpeedLimit, maxConcurrent });
-});
+export function getSnapshot() {
+  return {
+    downloads: queueManager.getAll(),
+    stats: queueManager.getStats(),
+    globalSpeedLimit: queueManager.getGlobalSpeedLimit(),
+    maxConcurrent: queueManager.getMaxConcurrent(),
+  };
+}
+
+downloadsApi.get('/', (c) => c.json(getSnapshot()));
 
 downloadsApi.post('/', async (c) => {
   const body = await c.req.json();

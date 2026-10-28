@@ -7,6 +7,7 @@ import { renderDownloadList } from './components/download-list.js';
 import { initAddUrlModal } from './components/add-url-modal.js';
 import { initSettingsModal } from './components/settings-modal.js';
 import { initDeleteConfirmModal } from './components/delete-confirm-modal.js';
+import { initContextMenu } from './components/context-menu.js';
 
 function init() {
   renderHeader(document.getElementById('header'));
@@ -18,8 +19,9 @@ function init() {
   initAddUrlModal();
   initSettingsModal();
   initDeleteConfirmModal();
+  initContextMenu();
 
-  store.startPolling(1500);
+  store.startLiveUpdates(1500);
 }
 
 document.addEventListener('DOMContentLoaded', init);

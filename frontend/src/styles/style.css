@@ -631,6 +631,23 @@ body {
 .progress-bar.completed { background: var(--accent-green); }
 .progress-bar.failed { background: var(--accent-red); }
 
+.progress-bar-container { position: relative; }
+.progress-bar.indeterminate {
+  position: absolute;
+  width: 35%;
+  transition: none;
+  animation: progress-indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes progress-indeterminate {
+  from { left: -35%; }
+  to { left: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-bar.indeterminate { animation: none; left: 0; width: 100%; opacity: 0.5; }
+}
+
 .download-meta {
   display: flex;
   align-items: center;
@@ -1339,3 +1356,168 @@ body {
     transform: scale(0.98);
   }
 }
+
+/* Desktop (Tauri, macOS): header doubles as an overlay title bar; leave room for the traffic lights. */
+.tauri-mac #header { padding-left: 84px; -webkit-user-select: none; user-select: none; }
+
+/* View toggle */
+.toolbar-spacer { flex: 1; }
+
+/* Card view */
+#download-list.view-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+#download-list.view-cards .download-empty { grid-column: 1 / -1; }
+#download-list.view-cards .download-item {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+#download-list.view-cards .download-info { flex: 1; min-width: 0; }
+#download-list.view-cards .download-filename,
+#download-list.view-cards .download-url {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#download-list.view-cards .download-status-badge { flex-shrink: 0; }
+#download-list.view-cards .download-progress-area { margin-top: auto; }
+#download-list.view-cards .download-meta { gap: 6px 12px; }
+#download-list.view-cards .download-actions {
+  width: 100%;
+  margin-left: 0;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Table view */
+#download-list.view-table {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.download-table-view {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.download-table-view th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.download-table-view td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+  color: var(--text-secondary);
+}
+.download-table-view tbody tr:last-child td { border-bottom: none; }
+/* Rows reuse .download-item for drag/drop; drop its card styling. */
+.download-table-view tr.download-item {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+}
+.download-table-view tr.download-item:hover td { background: var(--bg-tertiary); }
+.download-table-view .col-handle { width: 24px; padding-right: 0; }
+.download-table-view .col-num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.download-table-view .col-progress { min-width: 140px; width: 18%; }
+.download-table-view .col-actions { width: 1%; }
+.download-table-view .col-actions .download-actions { margin-left: 0; flex-wrap: nowrap; }
+.download-table-view .col-name { max-width: 0; width: 35%; }
+.row-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.row-name-text { min-width: 0; }
+.row-name .download-filename,
+.row-name .download-error {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-name .download-error { margin-top: 2px; padding: 0; background: none; border: none; font-size: 0.75rem; }
+.row-icon { flex-shrink: 0; width: 16px; text-align: center; }
+.row-icon.status-downloading { color: var(--accent-blue); }
+.row-icon.status-connecting { color: var(--accent-orange); }
+.row-icon.status-paused { color: var(--accent-yellow); }
+.row-icon.status-completed { color: var(--accent-green); }
+.row-icon.status-failed { color: var(--accent-red); }
+.row-icon.status-queued,
+.row-icon.status-stopped { color: var(--text-muted); }
+.row-progress { display: flex; align-items: center; gap: 8px; }
+.row-progress .progress-bar-container { flex: 1; }
+.row-progress span { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Context menu */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 210px;
+  padding: 5px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: calc(var(--radius) - 3px);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+.context-menu-item i { width: 14px; text-align: center; color: var(--text-secondary); }
+.context-menu-item:not(:disabled):hover,
+.context-menu-item:not(:disabled):focus-visible { background: var(--accent-blue); color: #fff; outline: none; }
+.context-menu-item:not(:disabled):hover i,
+.context-menu-item:not(:disabled):focus-visible i { color: #fff; }
+.context-menu-item:disabled { opacity: 0.4; cursor: default; }
+.context-menu-item.danger { color: var(--accent-red); }
+.context-menu-item.danger i { color: var(--accent-red); }
+.context-menu-item.danger:not(:disabled):hover { background: var(--accent-red); }
+.context-menu-sep { height: 1px; margin: 4px 6px; background: var(--border-color); }
+
+/* Sortable table headers */
+.download-table-view th.sortable { padding: 0; }
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.th-sort i { opacity: 0.35; font-size: 0.7rem; }
+.th-sort:hover { color: var(--text-primary); }
+.th-sort:hover i { opacity: 0.7; }
+.th-sort:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+th.sorted .th-sort { color: var(--accent-blue); }
+th.sorted .th-sort i { opacity: 1; }

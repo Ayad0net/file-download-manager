@@ -1,8 +1,20 @@
-import { pauseDownload, resumeDownload, stopDownload, retryDownload } from '../services/api.js';
+import { API_BASE, pauseDownload, resumeDownload, stopDownload, retryDownload } from '../services/api.js';
 import { store } from '../state/store.js';
 
 export function renderDownloadList(container) {
   const downloads = store.getFilteredDownloads();
+  container.classList.toggle('view-cards', store.view === 'cards');
+  container.classList.toggle('view-table', store.view === 'table');
+
+  if (!store.loaded) {
+    container.innerHTML = `
+      <div class="download-empty">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p style="color:var(--text-muted);font-size:0.9rem">Loading downloads…</p>
+      </div>
+    `;
+    return;
+  }
 
   if (downloads.length === 0) {
     container.innerHTML = `
@@ -11,6 +23,25 @@ export function renderDownloadList(container) {
         <h3>No downloads yet</h3>
         <p style="color:var(--text-muted);font-size:0.9rem">Add a URL to get started</p>
       </div>
+    `;
+    return;
+  }
+
+  if (store.view === 'table') {
+    const sorted = sortDownloads(downloads, store.sort);
+    // Manual drag-reordering only makes sense in queue order.
+    const draggable = !store.sort;
+    container.innerHTML = `
+      <table class="download-table-view${draggable ? '' : ' is-sorted'}">
+        <thead>
+          <tr>
+            <th class="col-handle"></th>
+            ${TABLE_COLUMNS.map(c => renderHeaderCell(c)).join('')}
+            <th class="col-actions"></th>
+          </tr>
+        </thead>
+        <tbody>${sorted.map(d => renderDownloadRow(d, draggable)).join('')}</tbody>
+      </table>
     `;
     return;
   }
@@ -53,11 +84,9 @@ function getStatusIcon(status) {
   return icons[status] || 'fa-question';
 }
 
-function renderDownloadItem(d) {
-  const progress = d.progress || 0;
+function renderActions(d) {
   const status = d.status;
   const isActive = status === 'downloading' || status === 'connecting';
-
   const actions = [];
   if (isActive) {
     actions.push(`<button class="btn btn-sm btn-icon action-pause" data-id="${d.id}" title="Pause"><i class="fas fa-pause"></i></button>`);
@@ -69,13 +98,107 @@ function renderDownloadItem(d) {
   } else if (status === 'failed' || status === 'stopped') {
     actions.push(`<button class="btn btn-sm btn-icon action-retry" data-id="${d.id}" title="Retry"><i class="fas fa-rotate-right"></i></button>`);
   } else if (status === 'completed') {
-    actions.push(`<a class="btn btn-sm btn-icon action-save" href="/api/downloads/${d.id}/file" download title="Save to PC"><i class="fas fa-download"></i></a>`);
+    actions.push(`<a class="btn btn-sm btn-icon action-save" href="${API_BASE}/downloads/${d.id}/file" download title="Save to PC"><i class="fas fa-download"></i></a>`);
   }
   if (status !== 'downloading' && status !== 'connecting') {
     actions.push(`<button class="btn btn-sm btn-icon btn-danger-soft action-delete" data-id="${d.id}" title="Delete"><i class="fas fa-trash"></i></button>`);
   }
+  return actions.join('');
+}
 
+function renderProgressBar(d) {
+  const progress = d.progress || 0;
+  const status = d.status;
+  const isActive = status === 'downloading' || status === 'connecting';
   const progressClass = status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : '';
+  // Server sent no Content-Length: size unknown, so show an animated bar instead of a stuck 0%.
+  const indeterminate = isActive && !d.totalBytes;
+  // The list re-renders on every poll; a negative delay keeps the animation phase continuous across re-renders.
+  const barStyle = indeterminate
+    ? `animation-delay: -${(Date.now() % 1500) / 1000}s`
+    : `width: ${Math.min(progress, 100)}%`;
+  return {
+    indeterminate,
+    html: `<div class="progress-bar-container"><div class="progress-bar ${progressClass}${indeterminate ? ' indeterminate' : ''}" style="${barStyle}"></div></div>`,
+  };
+}
+
+const STATUS_RANK = { downloading: 0, connecting: 1, queued: 2, paused: 3, stopped: 4, failed: 5, completed: 6 };
+
+const TABLE_COLUMNS = [
+  { key: 'name', label: 'Name', value: d => d.filename.toLowerCase() },
+  { key: 'status', label: 'Status', value: d => STATUS_RANK[d.status] ?? 99 },
+  { key: 'progress', label: 'Progress', className: 'col-progress', value: d => d.progress || 0 },
+  { key: 'size', label: 'Size', value: d => d.totalBytes ?? d.downloadedBytes ?? 0 },
+  { key: 'speed', label: 'Speed', value: d => (d.status === 'downloading' ? d.speed || 0 : 0) },
+  { key: 'eta', label: 'Time left', value: d => d.remainingTime },
+];
+
+function sortDownloads(list, sort) {
+  const col = sort && TABLE_COLUMNS.find(c => c.key === sort.key);
+  if (!col) return list;
+  const dir = sort.dir === 'desc' ? -1 : 1;
+  return [...list].sort((a, b) => {
+    const va = col.value(a);
+    const vb = col.value(b);
+    // Missing values (e.g. unknown time left) always go last.
+    if (va == null || vb == null) return va == null ? (vb == null ? 0 : 1) : -1;
+    if (va < vb) return -dir;
+    if (va > vb) return dir;
+    return 0;
+  });
+}
+
+function renderHeaderCell(col) {
+  const active = store.sort?.key === col.key;
+  const dir = active ? store.sort.dir : null;
+  const icon = dir === 'asc' ? 'fa-sort-up' : dir === 'desc' ? 'fa-sort-down' : 'fa-sort';
+  const aria = dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none';
+  return `
+    <th class="${col.className || ''} sortable${active ? ' sorted' : ''}" aria-sort="${aria}">
+      <button type="button" class="th-sort" data-sort="${col.key}" title="Sort by ${col.label}">
+        ${col.label} <i class="fas ${icon}"></i>
+      </button>
+    </th>
+  `;
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.th-sort');
+  if (btn) store.toggleSort(btn.dataset.sort);
+});
+
+function renderDownloadRow(d, draggable = true) {
+  const status = d.status;
+  const isActive = status === 'downloading' || status === 'connecting';
+  const bar = renderProgressBar(d);
+  const pct = bar.indeterminate ? '—' : `${Math.round(d.progress || 0)}%`;
+  return `
+    <tr class="download-item download-row" data-id="${d.id}" draggable="${draggable}">
+      <td class="col-handle">${draggable ? '<span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>' : ''}</td>
+      <td class="col-name">
+        <div class="row-name">
+          <i class="fas ${getStatusIcon(status)} row-icon status-${status}"></i>
+          <div class="row-name-text">
+            <div class="download-filename" title="${escapeHtml(d.filename)}">${escapeHtml(d.filename)}</div>
+            ${d.errorMessage ? `<div class="download-error" title="${escapeHtml(d.errorMessage)}">${escapeHtml(d.errorMessage)}</div>` : ''}
+          </div>
+        </div>
+      </td>
+      <td><span class="download-status-badge badge-${status}">${status}</span></td>
+      <td class="col-progress"><div class="row-progress">${bar.html}<span>${pct}</span></div></td>
+      <td class="col-num">${formatBytes(d.downloadedBytes)} / ${d.totalBytes ? formatBytes(d.totalBytes) : '?'}</td>
+      <td class="col-num">${isActive ? formatSpeed(d.speed) : '—'}</td>
+      <td class="col-num">${isActive && !bar.indeterminate ? formatTime(d.remainingTime) : '—'}</td>
+      <td class="col-actions"><div class="download-actions">${renderActions(d)}</div></td>
+    </tr>
+  `;
+}
+
+function renderDownloadItem(d) {
+  const progress = d.progress || 0;
+  const status = d.status;
+  const { indeterminate, html: progressBar } = renderProgressBar(d);
 
   return `
     <div class="download-item" data-id="${d.id}" draggable="true">
@@ -91,16 +214,14 @@ function renderDownloadItem(d) {
         <span class="download-status-badge badge-${status}">${status}</span>
       </div>
       <div class="download-progress-area">
-        <div class="progress-bar-container">
-          <div class="progress-bar ${progressClass}" style="width: ${Math.min(progress, 100)}%"></div>
-        </div>
+        ${progressBar}
         <div class="download-meta">
-          <span><i class="fas fa-file"></i> ${formatBytes(d.downloadedBytes)} / ${formatBytes(d.totalBytes)}</span>
+          <span><i class="fas fa-file"></i> ${formatBytes(d.downloadedBytes)} / ${d.totalBytes ? formatBytes(d.totalBytes) : 'Unknown size'}</span>
           <span><i class="fas fa-gauge-high"></i> ${formatSpeed(d.speed)}</span>
-          <span><i class="fas fa-clock"></i> ${formatTime(d.remainingTime)} left</span>
-          <span><i class="fas fa-percentage"></i> ${Math.round(progress)}%</span>
+          ${indeterminate ? '' : `<span><i class="fas fa-clock"></i> ${formatTime(d.remainingTime)} left</span>
+          <span><i class="fas fa-percentage"></i> ${Math.round(progress)}%</span>`}
           <div class="download-actions">
-            ${actions.join('')}
+            ${renderActions(d)}
           </div>
         </div>
         ${d.errorMessage ? `<div class="download-error"><i class="fas fa-exclamation-triangle"></i> ${escapeHtml(d.errorMessage)}</div>` : ''}

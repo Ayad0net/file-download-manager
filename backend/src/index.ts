@@ -4,7 +4,9 @@ import { cors } from 'hono/cors';
 import path from 'path';
 import fs from 'fs';
 import { initDatabase } from './database/db.js';
-import { downloadsApi } from './routes/downloads.js';
+import { streamSSE } from 'hono/streaming';
+import { downloadsApi, getSnapshot } from './routes/downloads.js';
+import { getVersion } from './services/change-notifier.js';
 import { settingsApi } from './routes/settings.js';
 import { queueManager } from './services/queue-manager.js';
 
@@ -20,6 +22,24 @@ async function main() {
 
   app.route('/api/downloads', downloadsApi);
   app.route('/api/settings', settingsApi);
+
+  // Live updates: push a snapshot whenever state changes (checked every 200ms), heartbeat otherwise.
+  app.get('/api/events', (c) => streamSSE(c, async (stream) => {
+    let sent = -1;
+    let idle = 0;
+    while (!stream.aborted) {
+      const v = getVersion();
+      if (v !== sent) {
+        sent = v;
+        idle = 0;
+        await stream.writeSSE({ data: JSON.stringify(getSnapshot()) });
+      } else if (++idle >= 75) {
+        idle = 0;
+        await stream.write(': ping\n\n');
+      }
+      await stream.sleep(200);
+    }
+  }));
 
   app.get('/api/stats', (c) => {
     return c.json(queueManager.getStats());

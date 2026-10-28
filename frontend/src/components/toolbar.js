@@ -14,7 +14,17 @@ export function renderToolbar(container) {
     <button class="btn" id="toolbar-resume-all" ${hasPaused ? '' : 'disabled'} title="${hasPaused ? 'Resume every paused download' : 'No paused downloads'}"><i class="fas fa-play"></i> Resume All</button>
     <button class="btn" id="toolbar-stop-all" ${hasActive ? '' : 'disabled'} title="${hasActive ? 'Stop every active download' : 'No active downloads'}"><i class="fas fa-stop"></i> Stop All</button>
     <button class="btn btn-danger" id="toolbar-clear-all" ${uncompletedCount === 0 ? 'disabled' : ''} title="${uncompletedCount === 0 ? 'No uncompleted downloads' : 'Remove uncompleted entries and their files'}"><i class="fas fa-broom"></i> Clear Uncompleted</button>
+    <div class="toolbar-spacer"></div>
+    <div class="segmented" id="toolbar-view" role="group" aria-label="View">
+      <button type="button" data-view="list" class="${store.view === 'list' ? 'active' : ''}" title="List view" aria-pressed="${store.view === 'list'}"><i class="fas fa-list"></i></button>
+      <button type="button" data-view="cards" class="${store.view === 'cards' ? 'active' : ''}" title="Card view" aria-pressed="${store.view === 'cards'}"><i class="fas fa-grip"></i></button>
+      <button type="button" data-view="table" class="${store.view === 'table' ? 'active' : ''}" title="Table view" aria-pressed="${store.view === 'table'}"><i class="fas fa-table"></i></button>
+    </div>
   `;
+
+  document.querySelectorAll('#toolbar-view button').forEach(btn => {
+    btn.onclick = () => store.setView(btn.dataset.view);
+  });
 
   document.getElementById('toolbar-add').onclick = () => {
     document.getElementById('add-url-modal').classList.remove('hidden');
