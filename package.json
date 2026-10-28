@@ -1,6 +1,6 @@
 {
   "name": "download-manager",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Web-based file download manager",
   "type": "module",
   "scripts": {

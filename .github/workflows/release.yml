@@ -22,7 +22,8 @@ jobs:
           - { name: macOS (Intel), os: macos-latest, target: x86_64-apple-darwin }
           - { name: Windows x64, os: windows-latest, target: x86_64-pc-windows-msvc }
           - { name: Linux x64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
-          - { name: Linux ARM64, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          # linuxdeploy fails to build the AppImage on ARM64 runners; ship .deb and .rpm only.
+          - { name: Linux ARM64, os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu, bundles: 'deb,rpm' }
     steps:
       - uses: actions/checkout@v4
 
@@ -64,7 +65,7 @@ jobs:
           NO_STRIP: true
         with:
           tauriScript: bunx tauri
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ matrix.bundles && format('--bundles {0}', matrix.bundles) || '' }}
           tagName: v__VERSION__
           releaseName: Download Manager v__VERSION__
           releaseBody: See CHANGELOG.md for what changed in this release.

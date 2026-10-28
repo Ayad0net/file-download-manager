@@ -2,7 +2,7 @@ import { LOGO_SVG } from './logo.js';
 import { store } from '../state/store.js';
 import { toggleTheme } from './settings-modal.js';
 
-const APP_VERSION = 'v1.5.0';
+const APP_VERSION = 'v1.5.1';
 
 export function renderHeader(container) {
   // Let the header act as the window's title bar in the desktop app.
