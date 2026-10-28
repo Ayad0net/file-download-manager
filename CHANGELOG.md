@@ -2,6 +2,10 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.4.1 — 2026-10-28 (Hotfix)
+
+- Fix Linux ARM64 AppImage bundling in the release workflow
+
 ## 1.4.0 — 2026-10-28 (Minor)
 
 - GitHub release workflow for macOS, Windows and Linux; cross-platform build scripts
