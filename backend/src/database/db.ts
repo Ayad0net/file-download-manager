@@ -41,6 +41,10 @@ export async function initDatabase(): Promise<SqlJsDatabase> {
     )
   `);
 
+  // Migration: JSON segment map for multi-connection downloads.
+  const cols = db.exec('PRAGMA table_info(downloads)')[0]?.values.map(r => r[1]) || [];
+  if (!cols.includes('segments')) db.run('ALTER TABLE downloads ADD COLUMN segments TEXT');
+
   db.run(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,

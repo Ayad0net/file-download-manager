@@ -12,6 +12,8 @@ export interface DownloadProgress {
   remainingTime: number | null;
   percentage: number;
   status: string;
+  /** Present for multi-connection downloads. */
+  segments?: { start: number; end: number; downloaded: number }[];
 }
 
 export type DownloadEventCallback = (progress: DownloadProgress) => void;
@@ -54,7 +56,7 @@ interface FinalResponse {
   res: http.IncomingMessage;
 }
 
-function requestWithRedirects(urlStr: string, options: RequestConfig): Promise<FinalResponse> {
+export function requestWithRedirects(urlStr: string, options: RequestConfig): Promise<FinalResponse> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const settle = (fn: () => void) => {
@@ -175,11 +177,11 @@ export async function startDownload(
   downloadId: string,
   urlStr: string,
   existingBytes: number = 0,
-  progressCallback: DownloadEventCallback | null = null
+  progressCallback: DownloadEventCallback | null = null,
+  filename: string = getFilenameFromUrl(urlStr)
 ): Promise<void> {
   if (activeDownloads.has(downloadId)) return;
 
-  const filename = getFilenameFromUrl(urlStr);
   const partPath = getDestPath(downloadId, filename, true);
   const finalPath = getDestPath(downloadId, filename, false);
 

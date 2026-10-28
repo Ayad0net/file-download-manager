@@ -5,6 +5,7 @@ class Store {
     this.stats = { total: 0, active: 0, completed: 0, failed: 0, paused: 0, queued: 0, totalDownloadedBytes: 0, freeDiskBytes: null };
     this.globalSpeedLimit = 0;
     this.maxConcurrent = 3;
+    this.connectionsPerDownload = 8;
     this.filter = 'all';
     this.view = ['cards', 'table'].includes(localStorage.getItem('dm-view')) ? localStorage.getItem('dm-view') : 'list';
     this.listeners = [];
@@ -45,6 +46,7 @@ class Store {
     this.stats = data.stats || this.stats;
     this.globalSpeedLimit = data.globalSpeedLimit ?? this.globalSpeedLimit;
     this.maxConcurrent = data.maxConcurrent ?? this.maxConcurrent;
+    this.connectionsPerDownload = data.connectionsPerDownload ?? this.connectionsPerDownload;
     this.notify();
   }
 

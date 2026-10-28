@@ -36,6 +36,16 @@ settingsApi.post('/max-concurrent', async (c) => {
   return c.json({ success: true, count });
 });
 
+settingsApi.post('/connections', async (c) => {
+  const body = await c.req.json();
+  const count = parseInt(body.count, 10);
+  if (isNaN(count) || count < 1 || count > 32) {
+    return c.json({ error: 'Invalid connection count' }, 400);
+  }
+  queueManager.setConnectionsPerDownload(count);
+  return c.json({ success: true, count });
+});
+
 settingsApi.post('/:key', async (c) => {
   const key = c.req.param('key');
   const body = await c.req.json();

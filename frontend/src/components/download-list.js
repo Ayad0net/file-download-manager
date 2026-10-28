@@ -117,10 +117,30 @@ function renderProgressBar(d) {
   const barStyle = indeterminate
     ? `animation-delay: -${(Date.now() % 1500) / 1000}s`
     : `width: ${Math.min(progress, 100)}%`;
+  const parts = getParts(d);
+  if (parts) {
+    return { indeterminate: false, parts: parts.length, html: renderSegmentedBar(parts, d.totalBytes, progressClass) };
+  }
   return {
     indeterminate,
     html: `<div class="progress-bar-container"><div class="progress-bar ${progressClass}${indeterminate ? ' indeterminate' : ''}" style="${barStyle}"></div></div>`,
   };
+}
+
+// Multi-connection downloads still in progress (completed ones show a plain full bar).
+function getParts(d) {
+  if (d.status === 'completed' || !d.totalBytes || !Array.isArray(d.segments) || d.segments.length < 2) return null;
+  return d.segments;
+}
+
+// One slot per part, placed at its byte range; each slot fills as that part downloads.
+function renderSegmentedBar(parts, total, progressClass) {
+  const slots = parts.map((s, i) => {
+    const len = s.end - s.start + 1;
+    const pct = Math.min(100, (s.downloaded / len) * 100);
+    return `<div class="segment-slot${pct >= 100 ? ' done' : ''}" style="left:${(s.start / total) * 100}%;width:${(len / total) * 100}%" title="Part ${i + 1}: ${Math.floor(pct)}% of ${formatBytes(len)}"><div class="segment-fill" style="width:${pct}%"></div></div>`;
+  }).join('');
+  return `<div class="progress-bar-container segmented-bar ${progressClass}" role="progressbar" aria-label="${parts.length} parts">${slots}</div>`;
 }
 
 const STATUS_RANK = { downloading: 0, connecting: 1, queued: 2, paused: 3, stopped: 4, failed: 5, completed: 6 };
@@ -198,7 +218,7 @@ function renderDownloadRow(d, draggable = true) {
 function renderDownloadItem(d) {
   const progress = d.progress || 0;
   const status = d.status;
-  const { indeterminate, html: progressBar } = renderProgressBar(d);
+  const { indeterminate, parts, html: progressBar } = renderProgressBar(d);
 
   return `
     <div class="download-item" data-id="${d.id}" draggable="true">
@@ -218,6 +238,7 @@ function renderDownloadItem(d) {
         <div class="download-meta">
           <span><i class="fas fa-file"></i> ${formatBytes(d.downloadedBytes)} / ${d.totalBytes ? formatBytes(d.totalBytes) : 'Unknown size'}</span>
           <span><i class="fas fa-gauge-high"></i> ${formatSpeed(d.speed)}</span>
+          ${parts ? `<span title="Downloading over ${parts} connections"><i class="fas fa-layer-group"></i> ${parts} parts</span>` : ''}
           ${indeterminate ? '' : `<span><i class="fas fa-clock"></i> ${formatTime(d.remainingTime)} left</span>
           <span><i class="fas fa-percentage"></i> ${Math.round(progress)}%</span>`}
           <div class="download-actions">

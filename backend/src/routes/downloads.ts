@@ -11,6 +11,7 @@ export function getSnapshot() {
     stats: queueManager.getStats(),
     globalSpeedLimit: queueManager.getGlobalSpeedLimit(),
     maxConcurrent: queueManager.getMaxConcurrent(),
+    connectionsPerDownload: queueManager.getConnectionsPerDownload(),
   };
 }
 

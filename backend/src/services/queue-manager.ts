@@ -8,6 +8,10 @@ import {
   startDownload, pauseDownload, stopDownload, probeUrl,
   getFileSize, DownloadProgress, getDownloadPath,
 } from './download-engine.js';
+import {
+  startSegmentedDownload, pauseSegmented, stopSegmented, probeRangeSupport,
+  planSegments, isValidPlan, MIN_SEGMENTED_SIZE, type Segment,
+} from './segmented-download.js';
 import { speedLimiter } from './speed-limiter.js';
 
 export interface DownloadRecord {
@@ -25,6 +29,7 @@ export interface DownloadRecord {
   speedLimit: number | null;
   errorMessage: string | null;
   filePath: string | null;
+  segments: Segment[] | null;
 }
 
 type ProgressHandler = (downloadId: string, progress: DownloadProgress) => void;
@@ -33,6 +38,7 @@ export const DOWNLOADS_DIR = path.resolve(process.env.DOWNLOAD_PATH || path.join
 
 class QueueManager {
   private maxConcurrent: number = 3;
+  private connectionsPerDownload: number = 8;
   private activeCount: number = 0;
   private progressHandlers: ProgressHandler[] = [];
   private downloadInProgress: Set<string> = new Set();
@@ -51,6 +57,10 @@ class QueueManager {
     if (row.length > 0 && row[0].values.length > 0) {
       this.maxConcurrent = parseInt(row[0].values[0][0] as string, 10) || 3;
     }
+    const connRow = db.exec("SELECT value FROM settings WHERE key = 'connections_per_download'");
+    if (connRow.length > 0 && connRow[0].values.length > 0) {
+      this.connectionsPerDownload = parseInt(connRow[0].values[0][0] as string, 10) || 8;
+    }
     const speedRow = db.exec("SELECT value FROM settings WHERE key = 'global_speed_limit'");
     if (speedRow.length > 0 && speedRow[0].values.length > 0) {
       const limit = parseInt(speedRow[0].values[0][0] as string, 10);
@@ -68,6 +78,18 @@ class QueueManager {
 
   getMaxConcurrent(): number {
     return this.maxConcurrent;
+  }
+
+  /** Applies to downloads started after the change. */
+  setConnectionsPerDownload(count: number): void {
+    this.connectionsPerDownload = Math.min(32, Math.max(1, count));
+    const db = getDb();
+    db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('connections_per_download', ?)", [String(this.connectionsPerDownload)]);
+    save();
+  }
+
+  getConnectionsPerDownload(): number {
+    return this.connectionsPerDownload;
   }
 
   setGlobalSpeedLimit(bytesPerSecond: number): void {
@@ -95,13 +117,14 @@ class QueueManager {
   private updateDownloadRecord(id: string, progress: DownloadProgress): void {
     const db = getDb();
     db.run(
-      `UPDATE downloads SET progress = ?, downloaded_bytes = ?, speed = ?, remaining_time = ?, total_bytes = ? WHERE id = ?`,
+      `UPDATE downloads SET progress = ?, downloaded_bytes = ?, speed = ?, remaining_time = ?, total_bytes = ?, segments = COALESCE(?, segments) WHERE id = ?`,
       [
         Math.round(progress.percentage * 100) / 100,
         progress.downloadedBytes,
         Math.round(progress.speed),
         progress.remainingTime != null ? Math.round(progress.remainingTime) : null,
         progress.totalBytes,
+        progress.segments ? JSON.stringify(progress.segments) : null,
         id,
       ]
     );
@@ -134,7 +157,7 @@ class QueueManager {
       const record: DownloadRecord = {
         id, url, filename, status: 'queued', progress: 0, downloadedBytes: 0,
         totalBytes: probed.size, speed: 0, remainingTime: null, createdAt: now,
-        queueOrder: nextOrder - 1, speedLimit: null, errorMessage: null, filePath: null,
+        queueOrder: nextOrder - 1, speedLimit: null, errorMessage: null, filePath: null, segments: null,
       };
       downloads.push(record);
     }
@@ -198,18 +221,33 @@ class QueueManager {
       return;
     }
 
-    db.run(`UPDATE downloads SET status = 'downloading', total_bytes = ? WHERE id = ?`, [size, record.id]);
+    // Multi-connection when the file is big enough and the server supports byte ranges.
+    const connections = this.connectionsPerDownload;
+    const rangeTotal = connections > 1 && (size ?? 0) >= MIN_SEGMENTED_SIZE ? await probeRangeSupport(record.url) : null;
+
+    db.run(`UPDATE downloads SET status = 'downloading', total_bytes = ? WHERE id = ?`, [rangeTotal ?? size, record.id]);
     save();
 
     try {
-      await startDownload(
-        record.id,
-        record.url,
-        downloadedBytes,
-        (progress) => {
-          this.emitProgress(record.id, progress);
+      const onProgress = (progress: DownloadProgress) => this.emitProgress(record.id, progress);
+      if (rangeTotal) {
+        const { partPath, finalPath } = getDownloadPath(record.id, record.filename);
+        let segments: Segment[];
+        if (isValidPlan(record.segments, rangeTotal) && fs.existsSync(partPath)) {
+          segments = record.segments;
+        } else if (downloadedBytes > 0 && downloadedBytes < rangeTotal && fs.existsSync(partPath)) {
+          // Resuming a single-connection download: keep its prefix, split the rest.
+          segments = [{ start: 0, end: rangeTotal - 1, downloaded: downloadedBytes }];
+        } else {
+          segments = planSegments(rangeTotal, connections);
         }
-      );
+        await startSegmentedDownload({
+          id: record.id, url: record.url, partPath, finalPath,
+          total: rangeTotal, connections, segments, progressCallback: onProgress,
+        });
+      } else {
+        await startDownload(record.id, record.url, downloadedBytes, onProgress, record.filename);
+      }
 
       const finalBytes = size && size > 0 ? size : (downloadedBytes || 0);
       if (this.removedIds.has(record.id) || !this.getById(record.id)) {
@@ -262,6 +300,7 @@ class QueueManager {
     const status = result[0].values[0][0] as string;
 
     const wasActive = status === 'downloading' || status === 'connecting';
+    if (wasActive) pauseSegmented(id);
 
     db.run(`UPDATE downloads SET status = 'paused' WHERE id = ? AND status NOT IN ('completed', 'failed', 'stopped')`, [id]);
     save();
@@ -285,6 +324,7 @@ class QueueManager {
     const status = result[0].values[0][0] as string;
 
     const wasActive = status === 'downloading' || status === 'connecting';
+    if (wasActive) stopSegmented(id);
 
     db.run(`UPDATE downloads SET status = 'stopped' WHERE id = ? AND status NOT IN ('completed', 'failed')`, [id]);
     save();
@@ -298,6 +338,7 @@ class QueueManager {
     const db = getDb();
     this.removedIds.add(id);
     stopDownload(id);
+    stopSegmented(id);
 
     const result = db.exec(`SELECT filename FROM downloads WHERE id = ?`, [id]);
     if (result.length > 0 && result[0].values.length > 0) {
@@ -327,7 +368,7 @@ class QueueManager {
   retry(id: string): void {
     const db = getDb();
     db.run(
-      `UPDATE downloads SET status = 'queued', progress = 0, downloaded_bytes = 0, error_message = NULL WHERE id = ?`,
+      `UPDATE downloads SET status = 'queued', progress = 0, downloaded_bytes = 0, segments = NULL, error_message = NULL WHERE id = ?`,
       [id]
     );
     save();
@@ -368,6 +409,7 @@ class QueueManager {
     for (const row of activeResult[0]?.values || []) {
       activeIds.push(row[0] as string);
     }
+    for (const id of activeIds) pauseSegmented(id);
     db.run(`UPDATE downloads SET status = 'paused' WHERE status IN ('queued', 'connecting', 'downloading')`);
     save();
     for (const id of activeIds) {
@@ -393,6 +435,7 @@ class QueueManager {
     for (const row of activeResult[0]?.values || []) {
       activeIds.push(row[0] as string);
     }
+    for (const id of activeIds) stopSegmented(id);
     db.run(`UPDATE downloads SET status = 'stopped' WHERE status IN ('queued', 'connecting', 'downloading', 'paused')`);
     save();
     for (const id of activeIds) {
@@ -458,6 +501,7 @@ class QueueManager {
       queueOrder: row[idx('queue_order')] as number,
       speedLimit: row[idx('speed_limit')] as number | null,
       errorMessage: row[idx('error_message')] as string | null,
+      segments: parseSegments(row[idx('segments')]),
       filePath: (row[idx('file_path')] as string | null) || path.join(DOWNLOADS_DIR, `${row[idx('id')]}_${row[idx('filename')]}`),
     };
   }
@@ -470,3 +514,8 @@ class QueueManager {
 }
 
 export const queueManager = new QueueManager();
+
+function parseSegments(raw: unknown): Segment[] | null {
+  if (typeof raw !== 'string') return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}

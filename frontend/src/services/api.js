@@ -79,6 +79,15 @@ export async function setMaxConcurrent(count) {
   return res.json();
 }
 
+export async function setConnections(count) {
+  const res = await fetch(`${API_BASE}/settings/connections`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ count }),
+  });
+  return res.json();
+}
+
 export async function pauseAll() {
   const res = await fetch(`${API_BASE}/actions/pause-all`, { method: 'POST' });
   return res.json();

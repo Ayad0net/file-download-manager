@@ -1521,3 +1521,23 @@ body {
 .th-sort:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
 th.sorted .th-sort { color: var(--accent-blue); }
 th.sorted .th-sort i { opacity: 1; }
+
+/* Multi-part progress bar */
+.segmented-bar { position: relative; display: block; }
+.segment-slot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  box-shadow: inset 1px 0 0 var(--bg-card);
+}
+.segment-slot:first-child { box-shadow: none; }
+.segment-fill {
+  height: 100%;
+  background: var(--accent-blue);
+  transition: width 0.3s ease;
+}
+.segment-slot.done .segment-fill { opacity: 0.75; }
+.segmented-bar.failed .segment-fill { background: var(--accent-red); }
+.download-item .segmented-bar,
+.download-table-view .segmented-bar { height: 8px; }

@@ -1,4 +1,4 @@
-import { setMaxConcurrent, setSpeedLimit } from '../services/api.js';
+import { setMaxConcurrent, setSpeedLimit, setConnections } from '../services/api.js';
 import { store } from '../state/store.js';
 
 const ACCENTS = [
@@ -75,6 +75,7 @@ export function initSettingsModal() {
 
   window.openSettings = () => {
     document.getElementById('setting-concurrent').value = store.maxConcurrent;
+    document.getElementById('setting-connections').value = store.connectionsPerDownload;
     document.getElementById('setting-speed-limit').value = Math.round((store.globalSpeedLimit || 0) / 1024);
     setModeSelection(document.documentElement.getAttribute('data-mode') || 'dark');
     setAccentSelection(document.documentElement.getAttribute('data-accent') || 'blue');
@@ -107,12 +108,14 @@ export function initSettingsModal() {
 
   saveBtn.onclick = async () => {
     const concurrent = parseInt(document.getElementById('setting-concurrent').value, 10) || 3;
+    const connections = Math.min(32, Math.max(1, parseInt(document.getElementById('setting-connections').value, 10) || 8));
     const speedLimit = parseInt(document.getElementById('setting-speed-limit').value, 10) || 0;
 
     try {
       saveBtn.disabled = true;
       saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
       await setMaxConcurrent(concurrent);
+      await setConnections(connections);
       await setSpeedLimit(speedLimit * 1024);
       applyTheme(getMode(), getAccent());
       window.showToast('Settings saved', 'success');
