@@ -8,6 +8,9 @@ import { initAddUrlModal } from './components/add-url-modal.js';
 import { initSettingsModal } from './components/settings-modal.js';
 import { initDeleteConfirmModal } from './components/delete-confirm-modal.js';
 import { initContextMenu } from './components/context-menu.js';
+import { initDesktopOpen } from './services/desktop-open.js';
+import { initWindowGuards } from './services/window-guards.js';
+import { initTray } from './services/tray.js';
 
 function init() {
   renderHeader(document.getElementById('header'));
@@ -20,6 +23,16 @@ function init() {
   initSettingsModal();
   initDeleteConfirmModal();
   initContextMenu();
+  initDesktopOpen();
+  initWindowGuards();
+  initTray();
+
+  // Desktop: reveal the (initially hidden) window only after this first frame is painted.
+  if (window.__TAURI__?.core) {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      window.__TAURI__.core.invoke('app_ready').catch(() => {});
+    }));
+  }
 
   store.startLiveUpdates(1500);
 }

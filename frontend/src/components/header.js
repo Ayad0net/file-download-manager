@@ -1,7 +1,8 @@
+import { LOGO_SVG } from './logo.js';
 import { store } from '../state/store.js';
 import { toggleTheme } from './settings-modal.js';
 
-const APP_VERSION = 'v1.0.0';
+const APP_VERSION = 'v1.3.0';
 
 export function renderHeader(container) {
   // Let the header act as the window's title bar in the desktop app.
@@ -10,9 +11,7 @@ export function renderHeader(container) {
   container.innerHTML = `
     <button id="sidebar-toggle"><i class="fas fa-bars"></i></button>
     <div class="header-logo">
-      <div class="logo-mark">
-        <i class="fas fa-arrow-down"></i>
-      </div>
+      <div class="logo-mark">${LOGO_SVG}</div>
       <div class="logo-text">
         <span class="logo-title">Download<em>Manager</em></span>
         <span class="logo-version">${APP_VERSION}</span>

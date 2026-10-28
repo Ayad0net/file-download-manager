@@ -1,5 +1,6 @@
 import { setMaxConcurrent, setSpeedLimit, setConnections } from '../services/api.js';
 import { store } from '../state/store.js';
+import { confirmAction } from './confirm-modal.js';
 
 const ACCENTS = [
   { value: 'blue', name: 'Slate', color: '#3b82f6' },
@@ -12,6 +13,7 @@ const ACCENTS = [
 ];
 
 const THEME_FADE_MS = 350;
+const tauri = window.__TAURI__;
 
 export function applyTheme(mode, accent) {
   const root = document.documentElement;
@@ -35,96 +37,221 @@ export function toggleTheme() {
   applyTheme(next, document.documentElement.getAttribute('data-accent') || 'blue');
 }
 
+/** Bytes per second as a short label, e.g. "512 KB/s", "2.4 MB/s". */
+function formatRate(bytesPerSec) {
+  const units = ['KB/s', 'MB/s', 'GB/s'];
+  let value = bytesPerSec / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i++;
+  }
+  return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+/** Reads a number input, clamps it to its min/max and writes the clamped value back. */
+function readClamped(input) {
+  const min = Number(input.min);
+  const max = Number(input.max);
+  const parsed = parseInt(input.value, 10);
+  const value = Math.min(max, Math.max(min, Number.isFinite(parsed) ? parsed : min));
+  input.value = value;
+  return value;
+}
+
+// Desktop app only: login item (autostart plugin) and close-to-tray (Rust-side prefs).
+async function loadDesktop() {
+  const [autostart, prefs] = await Promise.all([
+    tauri.core.invoke('plugin:autostart|is_enabled'),
+    tauri.core.invoke('get_desktop_prefs'),
+  ]);
+  return { autostart, closeToTray: prefs.closeToTray };
+}
+
+async function saveDesktop({ autostart, closeToTray }) {
+  const enabled = await tauri.core.invoke('plugin:autostart|is_enabled');
+  if (enabled !== autostart) {
+    await tauri.core.invoke(`plugin:autostart|${autostart ? 'enable' : 'disable'}`);
+  }
+  await tauri.core.invoke('set_desktop_prefs', { prefs: { closeToTray } });
+}
+
 export function initSettingsModal() {
   const modal = document.getElementById('settings-modal');
-  const card = modal.querySelector('.settings-modal');
-  const saveBtn = document.getElementById('settings-save');
-  const cancelBtn = document.getElementById('settings-cancel');
-  const closeBtn = document.getElementById('settings-close');
-  const modeSeg = document.getElementById('setting-mode-seg');
+  const dialog = modal.querySelector('.st-dialog');
+  const tabs = [...modal.querySelectorAll('.st-nav-item')];
+  const panes = [...modal.querySelectorAll('.st-pane')];
+  const modeButtons = [...modal.querySelectorAll('[data-mode-value]')];
   const accentGrid = document.getElementById('setting-accent-seg');
+  const speedInput = document.getElementById('setting-speed-limit');
+  const speedLabel = document.getElementById('setting-speed-label');
+  const hint = document.getElementById('settings-hint');
+  const errorEl = document.getElementById('settings-error');
+  const saveBtn = document.getElementById('settings-save');
+  const numberFields = [
+    document.getElementById('setting-concurrent'),
+    document.getElementById('setting-connections'),
+    speedInput,
+  ];
+  const autostartInput = document.getElementById('setting-autostart');
+  const closeToTrayInput = document.getElementById('setting-close-to-tray');
 
-  accentGrid.innerHTML = ACCENTS.map(t => `
-    <button type="button" class="theme-swatch" data-value="${t.value}" title="${t.name}">
-      <span class="dot" style="--sw:${t.color}"></span>
-      <span>${t.name}</span>
+  // Desktop-only rows and tabs stay hidden in the web version.
+  modal.querySelectorAll('[data-desktop-only]').forEach(el => { el.hidden = !tauri?.core; });
+
+  accentGrid.innerHTML = ACCENTS.map(a => `
+    <button type="button" class="st-swatch" role="radio" data-accent-value="${a.value}" title="${a.name}">
+      <span class="st-swatch-dot" style="--swatch:${a.color}"></span>
+      <span>${a.name}</span>
     </button>
   `).join('');
+  const accentButtons = [...accentGrid.querySelectorAll('[data-accent-value]')];
 
-  function getMode() {
-    return document.getElementById('setting-mode').value;
+  let mode = 'dark';
+  let accent = 'blue';
+  let initial = '';
+
+  const snapshot = () => JSON.stringify([
+    ...numberFields.map(f => f.value),
+    autostartInput.checked,
+    closeToTrayInput.checked,
+    mode,
+    accent,
+  ]);
+
+  function refresh() {
+    const kbPerSec = parseInt(speedInput.value, 10) || 0;
+    speedLabel.textContent = kbPerSec > 0 ? formatRate(kbPerSec * 1024) : 'Unlimited';
+    modeButtons.forEach(b => b.setAttribute('aria-checked', String(b.dataset.modeValue === mode)));
+    accentButtons.forEach(b => b.setAttribute('aria-checked', String(b.dataset.accentValue === accent)));
+    hint.hidden = snapshot() === initial;
   }
 
-  function getAccent() {
-    return document.getElementById('setting-accent').value;
-  }
-
-  function setModeSelection(value) {
-    document.getElementById('setting-mode').value = value;
-    modeSeg.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.value === value));
-  }
-
-  function setAccentSelection(value) {
-    document.getElementById('setting-accent').value = value;
-    accentGrid.querySelectorAll('.theme-swatch').forEach(b => b.classList.toggle('active', b.dataset.value === value));
+  function showTab(name) {
+    tabs.forEach(t => {
+      const on = t.dataset.tab === name;
+      t.classList.toggle('active', on);
+      if (on) t.setAttribute('aria-current', 'page');
+      else t.removeAttribute('aria-current');
+    });
+    panes.forEach(p => { p.hidden = p.dataset.pane !== name; });
   }
 
   function close() {
     modal.classList.add('hidden');
   }
 
-  window.openSettings = () => {
-    document.getElementById('setting-concurrent').value = store.maxConcurrent;
-    document.getElementById('setting-connections').value = store.connectionsPerDownload;
-    document.getElementById('setting-speed-limit').value = Math.round((store.globalSpeedLimit || 0) / 1024);
-    setModeSelection(document.documentElement.getAttribute('data-mode') || 'dark');
-    setAccentSelection(document.documentElement.getAttribute('data-accent') || 'blue');
+  async function requestClose() {
+    if (snapshot() !== initial) {
+      const discard = await confirmAction({
+        title: 'Discard changes?',
+        message: 'Settings you changed but did not save will be lost.',
+        icon: 'fa-triangle-exclamation',
+        tone: 'warning',
+        confirmText: 'Discard',
+      });
+      if (!discard) return;
+    }
+    close();
+  }
+
+  window.openSettings = async () => {
+    numberFields[0].value = store.maxConcurrent;
+    numberFields[1].value = store.connectionsPerDownload;
+    speedInput.value = Math.round((store.globalSpeedLimit || 0) / 1024);
+    mode = document.documentElement.getAttribute('data-mode') || 'dark';
+    accent = document.documentElement.getAttribute('data-accent') || 'blue';
+
+    if (tauri?.core) {
+      try {
+        const desktop = await loadDesktop();
+        autostartInput.checked = desktop.autostart;
+        closeToTrayInput.checked = desktop.closeToTray;
+      } catch (err) {
+        console.error('Failed to load desktop settings', err);
+      }
+    }
+
+    initial = snapshot();
+    errorEl.hidden = true;
+    showTab('downloads');
+    refresh();
     modal.classList.remove('hidden');
-    card.classList.remove('animating');
-    void card.offsetWidth;
-    card.classList.add('animating');
+    dialog.classList.remove('animating');
+    void dialog.offsetWidth;
+    dialog.classList.add('animating');
+    tabs.find(t => t.classList.contains('active'))?.focus();
   };
 
-  modeSeg.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-value]');
-    if (btn) setModeSelection(btn.dataset.value);
-  });
-
-  accentGrid.addEventListener('click', (e) => {
-    const btn = e.target.closest('.theme-swatch');
-    if (btn) setAccentSelection(btn.dataset.value);
-  });
-
-  closeBtn.onclick = close;
-  cancelBtn.onclick = close;
-
+  // One delegated handler for every control in the dialog.
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) close();
+    if (e.target === modal) return requestClose();
+
+    const tab = e.target.closest('.st-nav-item');
+    if (tab) return showTab(tab.dataset.tab);
+
+    const step = e.target.closest('[data-step]');
+    if (step) {
+      const input = document.getElementById(step.dataset.for);
+      const delta = Number(step.dataset.delta || 1) * Number(step.dataset.step);
+      const next = Math.min(Number(input.max), Math.max(Number(input.min), (parseInt(input.value, 10) || 0) + delta));
+      input.value = next;
+      return refresh();
+    }
+
+    const modeBtn = e.target.closest('[data-mode-value]');
+    if (modeBtn) {
+      mode = modeBtn.dataset.modeValue;
+      return refresh();
+    }
+
+    const swatch = e.target.closest('[data-accent-value]');
+    if (swatch) {
+      accent = swatch.dataset.accentValue;
+      refresh();
+    }
   });
 
+  modal.addEventListener('input', refresh);
+  modal.addEventListener('change', refresh);
+
+  modal.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('input[type="number"]')) saveBtn.click();
+  });
+
+  document.getElementById('settings-close').onclick = requestClose;
+  document.getElementById('settings-cancel').onclick = requestClose;
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modal.classList.contains('hidden')) close();
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) requestClose();
   });
 
   saveBtn.onclick = async () => {
-    const concurrent = parseInt(document.getElementById('setting-concurrent').value, 10) || 3;
-    const connections = Math.min(32, Math.max(1, parseInt(document.getElementById('setting-connections').value, 10) || 8));
-    const speedLimit = parseInt(document.getElementById('setting-speed-limit').value, 10) || 0;
+    const concurrent = readClamped(numberFields[0]);
+    const connections = readClamped(numberFields[1]);
+    const speedKb = readClamped(speedInput);
+    refresh();
 
+    errorEl.hidden = true;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
     try {
-      saveBtn.disabled = true;
-      saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
       await setMaxConcurrent(concurrent);
       await setConnections(connections);
-      await setSpeedLimit(speedLimit * 1024);
-      applyTheme(getMode(), getAccent());
+      await setSpeedLimit(speedKb * 1024);
+      if (tauri?.core) {
+        await saveDesktop({ autostart: autostartInput.checked, closeToTray: closeToTrayInput.checked });
+      }
+      applyTheme(mode, accent);
+      initial = snapshot();
+      refresh();
       window.showToast('Settings saved', 'success');
       close();
     } catch (err) {
-      window.showToast(err.message || 'Failed to save settings', 'error');
+      errorEl.textContent = err.message || 'Could not save settings';
+      errorEl.hidden = false;
     } finally {
       saveBtn.disabled = false;
-      saveBtn.innerHTML = '<i class="fas fa-check"></i> Save Changes';
+      saveBtn.innerHTML = '<i class="fas fa-check"></i> Save changes';
     }
   };
 }

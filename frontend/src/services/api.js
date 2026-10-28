@@ -13,7 +13,16 @@ export async function addDownloads(urls, filenames) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ urls, filenames }),
   });
-  if (!res.ok) throw new Error('Failed to add downloads');
+  if (!res.ok && res.status !== 400) throw new Error('Failed to add downloads');
+  return res.json();
+}
+
+export async function addTorrentFiles(files) {
+  const form = new FormData();
+  for (const f of files) form.append('files', f, f.name);
+  const res = await fetch(`${API_BASE}/downloads/torrent`, { method: 'POST', body: form });
+  // 400 still carries per-file error details for the caller to show.
+  if (!res.ok && res.status !== 400) throw new Error('Failed to add torrent files');
   return res.json();
 }
 

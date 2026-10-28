@@ -5,7 +5,7 @@ import { markChanged } from '../services/change-notifier.js';
 // Embedded into the binary by `bun build --compile`; resolves to node_modules in dev.
 import wasmPath from 'sql.js/dist/sql-wasm.wasm' with { type: 'file' };
 
-const DATA_DIR = process.env.DATA_DIR || path.resolve(import.meta.dir, '..', '..', '..', 'data');
+export const DATA_DIR = process.env.DATA_DIR || path.resolve(import.meta.dir, '..', '..', '..', 'data');
 const DB_PATH = path.join(DATA_DIR, 'downloads.db');
 
 let db: SqlJsDatabase;
@@ -44,6 +44,18 @@ export async function initDatabase(): Promise<SqlJsDatabase> {
   // Migration: JSON segment map for multi-connection downloads.
   const cols = db.exec('PRAGMA table_info(downloads)')[0]?.values.map(r => r[1]) || [];
   if (!cols.includes('segments')) db.run('ALTER TABLE downloads ADD COLUMN segments TEXT');
+  // Migration: torrent support.
+  const added: [string, string][] = [
+    ['kind', "TEXT NOT NULL DEFAULT 'http'"],
+    ['torrent_file', 'TEXT'],
+    ['info_hash', 'TEXT'],
+    ['peers', 'INTEGER'],
+    ['upload_speed', 'REAL'],
+    ['torrent_files', 'TEXT'],
+  ];
+  for (const [name, type] of added) {
+    if (!cols.includes(name)) db.run(`ALTER TABLE downloads ADD COLUMN ${name} ${type}`);
+  }
 
   db.run(`
     CREATE TABLE IF NOT EXISTS settings (

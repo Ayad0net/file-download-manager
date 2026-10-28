@@ -17,7 +17,7 @@ function buildItems(d) {
   if (opener) {
     items.push({ icon: 'fa-file-arrow-up', label: 'Open', disabled: !done, run: () => opener.openPath(d.filePath) });
     items.push({ icon: 'fa-folder-open', label: revealLabel, disabled: !done, run: () => opener.revealItemInDir(d.filePath) });
-  } else if (done) {
+  } else if (done && !(d.kind === 'torrent' && (d.torrentFiles?.length || 0) > 1)) {
     items.push({ icon: 'fa-download', label: 'Save to PC', run: () => { window.location.href = `${API_BASE}/downloads/${d.id}/file`; } });
   }
   items.push('sep');
@@ -29,10 +29,18 @@ function buildItems(d) {
   if (done) items.push({ icon: 'fa-rotate-right', label: 'Download Again', run: () => retryDownload(d.id) });
   items.push('sep');
 
-  items.push({ icon: 'fa-link', label: 'Copy URL', run: () => copy(d.url, 'URL copied') });
-  items.push({ icon: 'fa-file', label: 'Copy File Name', run: () => copy(d.filename, 'File name copied') });
+  const isTorrent = d.kind === 'torrent';
+  if (isTorrent) {
+    items.push({ icon: 'fa-magnet', label: 'Copy Magnet Link', run: () => copy(d.url, 'Magnet link copied') });
+    if (d.infoHash) items.push({ icon: 'fa-hashtag', label: 'Copy Info Hash', run: () => copy(d.infoHash, 'Info hash copied') });
+  } else {
+    items.push({ icon: 'fa-link', label: 'Copy URL', run: () => copy(d.url, 'URL copied') });
+  }
+  items.push({ icon: 'fa-file', label: isTorrent ? 'Copy Name' : 'Copy File Name', run: () => copy(d.filename, 'Name copied') });
   if (opener && done) items.push({ icon: 'fa-route', label: 'Copy File Path', run: () => copy(d.filePath, 'File path copied') });
-  items.push({ icon: 'fa-arrow-up-right-from-square', label: 'Open URL in Browser', run: () => (opener ? opener.openUrl(d.url) : window.open(d.url, '_blank', 'noopener')) });
+  if (!isTorrent) {
+    items.push({ icon: 'fa-arrow-up-right-from-square', label: 'Open URL in Browser', run: () => (opener ? opener.openUrl(d.url) : window.open(d.url, '_blank', 'noopener')) });
+  }
   items.push('sep');
 
   const ids = store.downloads.map(x => x.id);

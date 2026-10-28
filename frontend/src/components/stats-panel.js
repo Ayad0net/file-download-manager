@@ -1,6 +1,7 @@
 import { store } from '../state/store.js';
 
 export function renderStatsPanel(container) {
+  if (!store.loaded) return; // keep the static skeleton cards from index.html until data arrives
   const { stats } = store;
   container.innerHTML = `
     <div class="stat-card stat-active">
