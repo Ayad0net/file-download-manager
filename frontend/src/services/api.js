@@ -26,6 +26,28 @@ export async function addTorrentFiles(files) {
   return res.json();
 }
 
+export async function probeMedia(url) {
+  const res = await fetch(`${API_BASE}/downloads/media/probe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Could not read video info');
+  return data;
+}
+
+export async function addMedia(items, quality) {
+  const res = await fetch(`${API_BASE}/downloads/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items, quality }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to add videos');
+  return data;
+}
+
 export async function pauseDownload(id) {
   const res = await fetch(`${API_BASE}/downloads/${id}/pause`, { method: 'POST' });
   return res.json();

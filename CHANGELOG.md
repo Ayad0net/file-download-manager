@@ -2,6 +2,10 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.5.0 — 2026-10-28 (Minor)
+
+- YouTube video/playlist and TikTok downloader (via yt-dlp) with resolution picker
+
 ## 1.4.1 — 2026-10-28 (Hotfix)
 
 - Fix Linux ARM64 AppImage bundling in the release workflow

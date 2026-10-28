@@ -52,6 +52,8 @@ export async function initDatabase(): Promise<SqlJsDatabase> {
     ['peers', 'INTEGER'],
     ['upload_speed', 'REAL'],
     ['torrent_files', 'TEXT'],
+    // yt-dlp media downloads: chosen quality ('best', 'audio' or a max height).
+    ['media_quality', 'TEXT'],
   ];
   for (const [name, type] of added) {
     if (!cols.includes(name)) db.run(`ALTER TABLE downloads ADD COLUMN ${name} ${type}`);

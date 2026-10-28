@@ -94,7 +94,7 @@
       </div>
       <div class="modal-body">
         <label for="url-input">URLs or magnet links</label>
-        <textarea id="url-input" rows="5" placeholder="Paste one per line: https://… or magnet:?xt=urn:btih:…"></textarea>
+        <textarea id="url-input" rows="5" placeholder="Paste one per line: https://…, YouTube / TikTok links, or magnet:?xt=urn:btih:…"></textarea>
         <div id="torrent-drop" class="torrent-drop" tabindex="0" role="button" aria-label="Choose .torrent files">
           <i class="fas fa-magnet"></i>
           <span><strong>Open .torrent files</strong> or drop them here</span>
@@ -108,6 +108,36 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
         <button class="btn btn-primary" id="modal-confirm"><i class="fas fa-download"></i> Add to Queue</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="media-modal" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="media-title">
+      <div class="modal-header">
+        <h2 id="media-title"><i class="fab fa-youtube"></i> Choose Quality</h2>
+        <button class="modal-close" id="media-close" aria-label="Close"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="media-head">
+          <img id="media-thumb" class="media-thumb hidden" alt="">
+          <div class="media-head-text">
+            <div id="media-name" class="media-name"></div>
+            <div id="media-meta" class="media-meta"></div>
+          </div>
+        </div>
+        <label>Resolution</label>
+        <div id="media-qualities" class="media-qualities" role="radiogroup"></div>
+        <div id="media-ffmpeg-note" class="media-note hidden"><i class="fas fa-circle-info"></i> ffmpeg not found: only formats that already contain audio are offered (often up to 720p). Install ffmpeg for higher resolutions.</div>
+        <div id="media-entries-wrap" class="hidden">
+          <label class="media-entries-label"><span>Videos</span><button type="button" class="btn btn-sm btn-secondary" id="media-toggle-all">Select none</button></label>
+          <ul id="media-entries" class="media-entries"></ul>
+        </div>
+        <div id="media-error" class="error-msg hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="media-cancel">Cancel</button>
+        <button class="btn btn-primary" id="media-confirm"><i class="fas fa-download"></i> Download</button>
       </div>
     </div>
   </div>

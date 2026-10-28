@@ -1,4 +1,5 @@
 import { addDownloads, addTorrentFiles } from '../services/api.js';
+import { isMediaUrl, pickMediaQuality } from './media-modal.js';
 
 export function initAddUrlModal() {
   const modal = document.getElementById('add-url-modal');
@@ -76,7 +77,10 @@ export function initAddUrlModal() {
       return;
     }
 
-    const urls = raw.split('\n').map(s => s.trim()).filter(Boolean);
+    const allUrls = raw.split('\n').map(s => s.trim()).filter(Boolean);
+    // YouTube / TikTok links go through the quality picker instead of the HTTP engine.
+    const mediaUrls = allUrls.filter(isMediaUrl);
+    const urls = allUrls.filter(u => !isMediaUrl(u));
     const namesRaw = filenameInput.value.trim();
     const names = namesRaw ? namesRaw.split('\n').map(s => s.trim()).filter(Boolean) : undefined;
 
@@ -100,6 +104,25 @@ export function initAddUrlModal() {
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
       const results = [];
+      if (mediaUrls.length > 0) {
+        confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reading video info...';
+        modal.classList.add('hidden');
+        for (const u of mediaUrls) {
+          try {
+            results.push({ downloads: new Array(await pickMediaQuality(u)) });
+          } catch (err) {
+            results.push({ errors: [`${u}: ${err.message}`] });
+          }
+        }
+        if (urls.length === 0 && torrentFiles.length === 0) {
+          const added = results.reduce((n, r) => n + (r.downloads?.length || 0), 0);
+          const errors = results.flatMap(r => r.errors || []);
+          if (errors.length) showToast(errors.join('; '), added ? 'warning' : 'error');
+          else if (added) showToast(`Added ${added} video(s) to queue`, 'success');
+          close();
+          return;
+        }
+      }
       if (urls.length > 0) results.push(await addDownloads(urls, names));
       if (torrentFiles.length > 0) results.push(await addTorrentFiles(torrentFiles));
       const added = results.reduce((n, r) => n + (r.downloads?.length || 0), 0);

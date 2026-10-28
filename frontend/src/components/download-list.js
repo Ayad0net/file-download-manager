@@ -211,7 +211,7 @@ function renderDownloadRow(d, draggable = true) {
         <div class="row-name">
           <i class="fas ${getStatusIcon(status)} row-icon status-${status}"></i>
           <div class="row-name-text">
-            <div class="download-filename" title="${escapeHtml(d.filename)}">${d.kind === 'torrent' ? '<i class="fas fa-magnet torrent-mark" title="Torrent"></i>' : ''}${escapeHtml(d.filename)}</div>
+            <div class="download-filename" title="${escapeHtml(d.filename)}">${d.kind === 'torrent' ? '<i class="fas fa-magnet torrent-mark" title="Torrent"></i>' : ''}${d.kind === 'media' ? '<i class="fab fa-youtube media-mark" title="Video"></i>' : ''}${escapeHtml(d.filename)}</div>
             ${d.errorMessage ? `<div class="download-error" title="${escapeHtml(d.errorMessage)}">${escapeHtml(d.errorMessage)}</div>` : ''}
           </div>
         </div>

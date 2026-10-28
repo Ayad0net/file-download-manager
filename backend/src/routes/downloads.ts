@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import parseTorrent, { toMagnetURI } from 'parse-torrent';
 import { queueManager, DOWNLOADS_DIR, TORRENTS_DIR } from '../services/queue-manager.js';
 import { isTorrentSource } from '../services/torrent-manager.js';
+import { probeMedia, isMediaUrl, mediaToolsStatus } from '../services/media-downloader.js';
 
 const downloadsApi = new Hono();
 
@@ -56,6 +57,30 @@ downloadsApi.post('/', async (c) => {
 
   const downloads = await queueManager.addDownloads(validUrls, names);
   return c.json({ downloads, errors: errors.length > 0 ? errors : undefined }, 201);
+});
+
+// YouTube / TikTok: list available resolutions (and playlist entries) before queueing.
+downloadsApi.get('/media/status', (c) => c.json(mediaToolsStatus()));
+
+downloadsApi.post('/media/probe', async (c) => {
+  const { url } = await c.req.json();
+  if (typeof url !== 'string' || !isMediaUrl(url)) return c.json({ error: 'Not a YouTube or TikTok URL' }, 400);
+  try {
+    return c.json(await probeMedia(url));
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Could not read media info' }, 422);
+  }
+});
+
+downloadsApi.post('/media', async (c) => {
+  const body = await c.req.json();
+  const quality = String(body.quality || 'best');
+  if (!/^(best|audio|\d{2,4})$/.test(quality)) return c.json({ error: 'Invalid quality' }, 400);
+  const items = (Array.isArray(body.items) ? body.items : [])
+    .filter((i: any) => typeof i?.url === 'string' && /^https?:\/\//.test(i.url))
+    .map((i: any) => ({ url: i.url, title: String(i.title || '').slice(0, 200) }));
+  if (items.length === 0) return c.json({ error: 'No videos selected' }, 400);
+  return c.json({ downloads: queueManager.addMedia(items, quality) }, 201);
 });
 
 // Upload one or more .torrent files (multipart field "files").
@@ -182,7 +207,9 @@ downloadsApi.get('/:id/file', (c) => {
     return serveTorrentFile(c, id, 0);
   }
 
-  const filePath = path.join(DOWNLOADS_DIR, `${id}_${record.filename}`);
+  const filePath = record.kind === 'media'
+    ? path.join(DOWNLOADS_DIR, id, path.basename(record.filename))
+    : path.join(DOWNLOADS_DIR, `${id}_${record.filename}`);
   if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     return c.json({ error: 'File no longer exists on the server' }, 404);
   }

@@ -17,6 +17,7 @@ import {
   type TorrentFileInfo,
 } from './torrent-manager.js';
 import { speedLimiter } from './speed-limiter.js';
+import { startMedia, stopMedia } from './media-downloader.js';
 
 export interface DownloadRecord {
   id: string;
@@ -34,7 +35,8 @@ export interface DownloadRecord {
   errorMessage: string | null;
   filePath: string | null;
   segments: Segment[] | null;
-  kind: 'http' | 'torrent';
+  kind: 'http' | 'torrent' | 'media';
+  mediaQuality: string | null;
   /** Saved .torrent file for torrents added by upload. */
   torrentFile: string | null;
   infoHash: string | null;
@@ -181,6 +183,58 @@ class QueueManager {
     return downloads;
   }
 
+  /** Adds YouTube/TikTok videos downloaded by yt-dlp; each lives in DOWNLOADS_DIR/<id>/. */
+  addMedia(items: { url: string; title: string }[], quality: string): DownloadRecord[] {
+    const db = getDb();
+    const maxOrder = db.exec('SELECT COALESCE(MAX(queue_order), -1) as m FROM downloads');
+    let order = maxOrder.length > 0 ? (maxOrder[0].values[0][0] as number) + 1 : 0;
+    const records: DownloadRecord[] = [];
+    for (const item of items) {
+      const id = uuidv4();
+      db.run(
+        `INSERT INTO downloads (id, url, filename, status, progress, downloaded_bytes, created_at, queue_order, kind, media_quality)
+         VALUES (?, ?, ?, 'queued', 0, 0, ?, ?, 'media', ?)`,
+        [id, item.url, item.title || 'Video', new Date().toISOString(), order++, quality]
+      );
+      records.push(this.getById(id)!);
+    }
+    save();
+    this.processQueue();
+    return records;
+  }
+
+  private async beginMedia(record: DownloadRecord): Promise<void> {
+    const db = getDb();
+    const id = record.id;
+    db.run(`UPDATE downloads SET status = 'downloading' WHERE id = ?`, [id]);
+    save();
+    try {
+      const filename = await startMedia({
+        id, url: record.url, quality: record.mediaQuality || 'best', dir: path.join(DOWNLOADS_DIR, id),
+        onProgress: (p) => { if (this.getById(id)) this.emitProgress(id, p); },
+      });
+      if (this.removedIds.has(id) || !this.getById(id)) {
+        this.cleanupFiles(id, record.filename);
+        return;
+      }
+      const size = fs.statSync(path.join(DOWNLOADS_DIR, id, filename)).size;
+      db.run(
+        `UPDATE downloads SET status = 'completed', filename = ?, progress = 100, downloaded_bytes = ?, total_bytes = ?, speed = 0, remaining_time = NULL WHERE id = ?`,
+        [filename, size, size, id]
+      );
+      save();
+    } catch (err: any) {
+      if (this.removedIds.has(id) || !this.getById(id)) return;
+      const status = this.getById(id)!.status;
+      if (status === 'paused' || status === 'stopped') return;
+      db.run(`UPDATE downloads SET status = 'failed', speed = 0, error_message = ? WHERE id = ?`, [err.message || 'Media download failed', id]);
+      save();
+    } finally {
+      this.downloadInProgress.delete(id);
+      this.processQueue();
+    }
+  }
+
   /** Adds a torrent from an uploaded .torrent file (already parsed and saved by the route). */
   addTorrentFile(opts: { id: string; magnet: string; name: string; size: number; infoHash: string; torrentFile: string }): DownloadRecord {
     const db = getDb();
@@ -288,6 +342,7 @@ class QueueManager {
     this.downloadInProgress.add(record.id);
 
     if (record.kind === 'torrent') return this.beginTorrent(record);
+    if (record.kind === 'media') return this.beginMedia(record);
 
     db.run(`UPDATE downloads SET status = 'connecting' WHERE id = ?`, [record.id]);
     save();
@@ -395,6 +450,7 @@ class QueueManager {
     if (wasActive) {
       pauseSegmented(id);
       pauseTorrent(id);
+      stopMedia(id);
     }
 
     db.run(`UPDATE downloads SET status = 'paused' WHERE id = ? AND status NOT IN ('completed', 'failed', 'stopped')`, [id]);
@@ -422,6 +478,7 @@ class QueueManager {
     if (wasActive) {
       stopSegmented(id);
       pauseTorrent(id);
+      stopMedia(id);
     }
 
     db.run(`UPDATE downloads SET status = 'stopped' WHERE id = ? AND status NOT IN ('completed', 'failed')`, [id]);
@@ -438,6 +495,7 @@ class QueueManager {
     stopDownload(id);
     stopSegmented(id);
     pauseTorrent(id);
+    stopMedia(id);
 
     const result = db.exec(`SELECT filename FROM downloads WHERE id = ?`, [id]);
     if (result.length > 0 && result[0].values.length > 0) {
@@ -450,7 +508,7 @@ class QueueManager {
   }
 
   private cleanupFiles(id: string, filename: string): void {
-    // Torrents download into their own folder, plus an optional saved .torrent file.
+    // Torrents and media download into their own folder, plus an optional saved .torrent file.
     const torrentDir = path.join(DOWNLOADS_DIR, id);
     try { if (fs.existsSync(torrentDir)) fs.rmSync(torrentDir, { recursive: true, force: true }); } catch {}
     try {
@@ -515,7 +573,7 @@ class QueueManager {
     for (const row of activeResult[0]?.values || []) {
       activeIds.push(row[0] as string);
     }
-    for (const id of activeIds) { pauseSegmented(id); pauseTorrent(id); }
+    for (const id of activeIds) { pauseSegmented(id); pauseTorrent(id); stopMedia(id); }
     db.run(`UPDATE downloads SET status = 'paused' WHERE status IN ('queued', 'connecting', 'downloading')`);
     save();
     for (const id of activeIds) {
@@ -541,7 +599,7 @@ class QueueManager {
     for (const row of activeResult[0]?.values || []) {
       activeIds.push(row[0] as string);
     }
-    for (const id of activeIds) { stopSegmented(id); pauseTorrent(id); }
+    for (const id of activeIds) { stopSegmented(id); pauseTorrent(id); stopMedia(id); }
     db.run(`UPDATE downloads SET status = 'stopped' WHERE status IN ('queued', 'connecting', 'downloading', 'paused')`);
     save();
     for (const id of activeIds) {
@@ -608,7 +666,8 @@ class QueueManager {
       speedLimit: row[idx('speed_limit')] as number | null,
       errorMessage: row[idx('error_message')] as string | null,
       segments: parseJson(row[idx('segments')]),
-      kind: row[idx('kind')] === 'torrent' ? 'torrent' : 'http',
+      kind: row[idx('kind')] === 'torrent' || row[idx('kind')] === 'media' ? row[idx('kind')] : 'http',
+      mediaQuality: row[idx('media_quality')] as string | null,
       torrentFile: row[idx('torrent_file')] as string | null,
       infoHash: row[idx('info_hash')] as string | null,
       peers: row[idx('peers')] as number | null,
@@ -617,7 +676,7 @@ class QueueManager {
         ...f,
         absPath: path.join(DOWNLOADS_DIR, row[idx('id')] as string, f.path),
       })) ?? null,
-      filePath: (row[idx('file_path')] as string | null) || (row[idx('kind')] === 'torrent'
+      filePath: (row[idx('file_path')] as string | null) || (row[idx('kind')] !== 'http'
         ? path.join(DOWNLOADS_DIR, row[idx('id')] as string, row[idx('filename')] as string)
         : path.join(DOWNLOADS_DIR, `${row[idx('id')]}_${row[idx('filename')]}`)),
     };
