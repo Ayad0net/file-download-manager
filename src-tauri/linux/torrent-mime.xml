@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Installed to /usr/share/mime/packages by the .deb/.rpm (bundle.linux.*.files).
+  Gives .torrent files this app's document icon; the icon PNGs are installed into the
+  hicolor theme under the same name. Package triggers run update-mime-database and
+  gtk-update-icon-cache automatically.
+-->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-bittorrent">
+    <comment>BitTorrent file</comment>
+    <glob pattern="*.torrent"/>
+    <icon name="com.ayadkorial.downloadmanager.torrent"/>
+  </mime-type>
+</mime-info>

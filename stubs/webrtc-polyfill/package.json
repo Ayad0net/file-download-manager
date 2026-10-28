@@ -1,0 +1,8 @@
+{
+  "name": "webrtc-polyfill",
+  "version": "1.1.99",
+  "description": "Stub: disables WebRTC (browser-only peers) so the torrent engine has no native dependencies and can be compiled into a single cross-platform binary.",
+  "type": "module",
+  "main": "index.js",
+  "exports": { ".": "./index.js" }
+}

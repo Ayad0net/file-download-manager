@@ -1,18 +1,29 @@
 import { API_BASE, pauseDownload, resumeDownload, stopDownload, retryDownload } from '../services/api.js';
 import { store } from '../state/store.js';
 
+const opener = window.__TAURI__?.opener;
+// Torrents whose file panel is open; kept across re-renders.
+const expandedFiles = new Set();
+
 export function renderDownloadList(container) {
   const downloads = store.getFilteredDownloads();
   container.classList.toggle('view-cards', store.view === 'cards');
   container.classList.toggle('view-table', store.view === 'table');
 
   if (!store.loaded) {
-    container.innerHTML = `
-      <div class="download-empty">
-        <i class="fas fa-spinner fa-spin"></i>
-        <p style="color:var(--text-muted);font-size:0.9rem">Loading downloads…</p>
-      </div>
-    `;
+    // Placeholder rows shaped like real items, so the layout doesn't jump when data arrives.
+    const row = `
+      <div class="download-item skeleton-item" aria-hidden="true">
+        <div class="download-item-header">
+          <span class="skeleton" style="width:36px;height:36px;border-radius:var(--radius)"></span>
+          <div class="download-info">
+            <span class="skeleton" style="width:45%;height:12px"></span>
+            <span class="skeleton" style="width:70%;height:10px;margin-top:8px"></span>
+          </div>
+        </div>
+        <span class="skeleton" style="width:100%;height:6px;margin-top:6px"></span>
+      </div>`;
+    container.innerHTML = `<div aria-busy="true" aria-label="Loading downloads">${row.repeat(4)}</div>`;
     return;
   }
 
@@ -97,7 +108,7 @@ function renderActions(d) {
     actions.push(`<button class="btn btn-sm btn-icon action-pause" data-id="${d.id}" title="Pause"><i class="fas fa-pause"></i></button>`);
   } else if (status === 'failed' || status === 'stopped') {
     actions.push(`<button class="btn btn-sm btn-icon action-retry" data-id="${d.id}" title="Retry"><i class="fas fa-rotate-right"></i></button>`);
-  } else if (status === 'completed') {
+  } else if (status === 'completed' && !(d.kind === 'torrent' && (d.torrentFiles?.length || 0) > 1)) {
     actions.push(`<a class="btn btn-sm btn-icon action-save" href="${API_BASE}/downloads/${d.id}/file" download title="Save to PC"><i class="fas fa-download"></i></a>`);
   }
   if (status !== 'downloading' && status !== 'connecting') {
@@ -200,7 +211,7 @@ function renderDownloadRow(d, draggable = true) {
         <div class="row-name">
           <i class="fas ${getStatusIcon(status)} row-icon status-${status}"></i>
           <div class="row-name-text">
-            <div class="download-filename" title="${escapeHtml(d.filename)}">${escapeHtml(d.filename)}</div>
+            <div class="download-filename" title="${escapeHtml(d.filename)}">${d.kind === 'torrent' ? '<i class="fas fa-magnet torrent-mark" title="Torrent"></i>' : ''}${escapeHtml(d.filename)}</div>
             ${d.errorMessage ? `<div class="download-error" title="${escapeHtml(d.errorMessage)}">${escapeHtml(d.errorMessage)}</div>` : ''}
           </div>
         </div>
@@ -215,10 +226,43 @@ function renderDownloadRow(d, draggable = true) {
   `;
 }
 
+function renderTorrentFiles(d) {
+  const files = d.torrentFiles || [];
+  const rows = files.map((f, i) => {
+    const pct = f.length ? Math.min(100, (f.downloaded / f.length) * 100) : 100;
+    const done = pct >= 100;
+    let action = '';
+    if (done && opener && f.absPath) {
+      action = `<button type="button" class="btn btn-sm btn-icon action-reveal-file" data-id="${d.id}" data-path="${escapeHtml(f.absPath)}" title="Show in folder"><i class="fas fa-folder-open"></i></button>`;
+    } else if (done) {
+      action = `<a class="btn btn-sm btn-icon" href="${API_BASE}/downloads/${d.id}/files/${i}" download title="Save to PC"><i class="fas fa-download"></i></a>`;
+    }
+    // Drop the torrent's root folder from displayed paths.
+    const shown = f.path.split(/[\\/]/).slice(1).join('/') || f.name;
+    return `
+      <li class="tfile${done ? ' done' : ''}">
+        <i class="fas ${done ? 'fa-circle-check' : 'fa-file'} tfile-icon"></i>
+        <span class="tfile-name" title="${escapeHtml(shown)}">${escapeHtml(shown)}</span>
+        <span class="tfile-size">${formatBytes(f.length)}</span>
+        <span class="tfile-bar"><span style="width:${pct}%"></span></span>
+        <span class="tfile-pct">${Math.floor(pct)}%</span>
+        <span class="tfile-action">${action}</span>
+      </li>`;
+  }).join('');
+  return `<ul class="torrent-files">${rows}</ul>`;
+}
+
 function renderDownloadItem(d) {
   const progress = d.progress || 0;
   const status = d.status;
   const { indeterminate, parts, html: progressBar } = renderProgressBar(d);
+  const isTorrent = d.kind === 'torrent';
+  const fileCount = d.torrentFiles?.length || 0;
+  const filesOpen = isTorrent && fileCount > 1 && expandedFiles.has(d.id);
+  const isActive = status === 'downloading' || status === 'connecting';
+  const subline = isTorrent
+    ? `<i class="fas fa-magnet"></i> Torrent${fileCount ? ` · ${fileCount} file${fileCount === 1 ? '' : 's'}` : ' · fetching metadata'}`
+    : escapeHtml(d.url);
 
   return `
     <div class="download-item" data-id="${d.id}" draggable="true">
@@ -229,7 +273,7 @@ function renderDownloadItem(d) {
         </div>
         <div class="download-info">
           <div class="download-filename">${escapeHtml(d.filename)}</div>
-          <div class="download-url">${escapeHtml(d.url)}</div>
+          <div class="download-url${isTorrent ? ' is-torrent' : ''}">${subline}</div>
         </div>
         <span class="download-status-badge badge-${status}">${status}</span>
       </div>
@@ -239,6 +283,9 @@ function renderDownloadItem(d) {
           <span><i class="fas fa-file"></i> ${formatBytes(d.downloadedBytes)} / ${d.totalBytes ? formatBytes(d.totalBytes) : 'Unknown size'}</span>
           <span><i class="fas fa-gauge-high"></i> ${formatSpeed(d.speed)}</span>
           ${parts ? `<span title="Downloading over ${parts} connections"><i class="fas fa-layer-group"></i> ${parts} parts</span>` : ''}
+          ${isTorrent && isActive ? `<span title="Connected peers"><i class="fas fa-users"></i> ${d.peers || 0} peers</span>
+          <span title="Upload speed"><i class="fas fa-arrow-up"></i> ${formatSpeed(d.uploadSpeed)}</span>` : ''}
+          ${isTorrent && fileCount > 1 ? `<button type="button" class="files-toggle action-files" data-id="${d.id}" aria-expanded="${filesOpen}"><i class="fas fa-chevron-${filesOpen ? 'up' : 'down'}"></i> Files (${fileCount})</button>` : ''}
           ${indeterminate ? '' : `<span><i class="fas fa-clock"></i> ${formatTime(d.remainingTime)} left</span>
           <span><i class="fas fa-percentage"></i> ${Math.round(progress)}%</span>`}
           <div class="download-actions">
@@ -246,6 +293,7 @@ function renderDownloadItem(d) {
           </div>
         </div>
         ${d.errorMessage ? `<div class="download-error"><i class="fas fa-exclamation-triangle"></i> ${escapeHtml(d.errorMessage)}</div>` : ''}
+        ${filesOpen ? renderTorrentFiles(d) : ''}
       </div>
     </div>
   `;
@@ -267,6 +315,18 @@ document.addEventListener('click', async (e) => {
   if (!btn) return;
 
   const id = btn.dataset.id;
+
+  if (btn.classList.contains('action-files')) {
+    e.stopPropagation();
+    if (expandedFiles.has(id)) expandedFiles.delete(id); else expandedFiles.add(id);
+    renderDownloadList(document.getElementById('download-list'));
+    return;
+  }
+  if (btn.classList.contains('action-reveal-file')) {
+    e.stopPropagation();
+    opener?.revealItemInDir(btn.dataset.path).catch(err => window.showToast?.(`Couldn't show file: ${err}`, 'error'));
+    return;
+  }
 
   if (btn.classList.contains('action-pause')) {
     e.stopPropagation();

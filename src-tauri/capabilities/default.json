@@ -15,6 +15,7 @@
           "path": "$DOWNLOAD/Download Manager/**"
         }
       ]
-    }
+    },
+    "autostart:default"
   ]
 }

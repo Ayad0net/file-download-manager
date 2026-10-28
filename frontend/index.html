@@ -2,7 +2,7 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Download Manager</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <script>
@@ -21,24 +21,69 @@
       if (window.__TAURI_INTERNALS__ && /Mac/.test(navigator.platform)) document.documentElement.classList.add('tauri-mac');
     })();
   </script>
-  <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
   <link rel="stylesheet" href="src/styles/style.css">
+  <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
+  <!-- Fetch the icon font and every module in parallel instead of discovering them import by import. -->
+  <link rel="preload" href="vendor/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="modulepreload" href="src/app.js">
+  <link rel="modulepreload" href="src/components/add-url-modal.js">
+  <link rel="modulepreload" href="src/components/confirm-modal.js">
+  <link rel="modulepreload" href="src/components/context-menu.js">
+  <link rel="modulepreload" href="src/components/delete-confirm-modal.js">
+  <link rel="modulepreload" href="src/components/download-list.js">
+  <link rel="modulepreload" href="src/components/header.js">
+  <link rel="modulepreload" href="src/components/logo.js">
+  <link rel="modulepreload" href="src/components/settings-modal.js">
+  <link rel="modulepreload" href="src/components/sidebar.js">
+  <link rel="modulepreload" href="src/components/stats-panel.js">
+  <link rel="modulepreload" href="src/components/toolbar.js">
+  <link rel="modulepreload" href="src/services/api.js">
+  <link rel="modulepreload" href="src/services/desktop-open.js">
+  <link rel="modulepreload" href="src/services/tray.js">
+  <link rel="modulepreload" href="src/services/window-guards.js">
+  <link rel="modulepreload" href="src/state/store.js">
 </head>
 <body>
   <div id="app">
-    <header id="header"></header>
+    <!-- Static app shell: painted immediately, replaced by the components once JS runs. -->
+    <header id="header">
+      <div class="header-logo">
+        <div class="logo-mark"><svg class="logo-svg" viewBox="0 0 100 100" aria-hidden="true"><rect x="0.75" y="0.75" width="98.5" height="98.5" rx="22" class="logo-tile"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M54.14 18.13A29.73 29.73 0 0 1 77.57 36.43" opacity="1"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M76.72 60.61A29.73 29.73 0 0 1 61.14 75.14" opacity="0.72"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M38.86 75.14A29.73 29.73 0 0 1 23.28 60.61" opacity="0.48"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M21.72 38.38A29.73 29.73 0 0 1 42.81 18.72" opacity="0.28"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="7.04" d="M50.0 30.58V58.5"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="7.04" d="M37.86 47.57L50.0 59.71L62.14 47.57"/><rect x="36.65" y="66.99" width="26.7" height="5.34" rx="2.67" fill="currentColor"/></svg></div>
+        <div class="logo-text"><span class="logo-title">Download<em>Manager</em></span></div>
+      </div>
+    </header>
     <div id="main-layout">
-      <aside id="sidebar"></aside>
+      <aside id="sidebar">
+        <div class="nav-head"><span class="skeleton" style="width:56px;height:10px"></span></div>
+        <div class="nav-scroll">
+          <span class="skeleton skeleton-nav"></span>
+          <span class="skeleton skeleton-nav"></span>
+          <span class="skeleton skeleton-nav"></span>
+          <span class="skeleton skeleton-nav"></span>
+          <span class="skeleton skeleton-nav"></span>
+          <span class="skeleton skeleton-nav"></span>
+        </div>
+      </aside>
       <main id="content">
-        <div id="toolbar"></div>
-        <div id="stats-panel"></div>
+        <div id="toolbar">
+          <span class="skeleton skeleton-btn" style="width:104px"></span>
+          <span class="skeleton skeleton-btn"></span>
+          <span class="skeleton skeleton-btn"></span>
+          <span class="skeleton skeleton-btn"></span>
+        </div>
+        <div id="stats-panel">
+          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
+          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
+          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
+          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
+        </div>
         <div id="download-list"></div>
+        <footer id="footer">
+          Crafted with <i class="fas fa-heart"></i> by <strong>Ayad E. Korial</strong>
+        </footer>
       </main>
     </div>
 
-    <footer id="footer">
-      Crafted with <i class="fas fa-heart"></i> by <strong>Ayad E. Korial</strong>
-    </footer>
   </div>
 
   <div id="add-url-modal" class="modal-overlay hidden">
@@ -48,8 +93,14 @@
         <button class="modal-close" id="modal-close"><i class="fas fa-times"></i></button>
       </div>
       <div class="modal-body">
-        <label for="url-input">URL(s)</label>
-        <textarea id="url-input" rows="5" placeholder="Paste one or multiple URLs here (one per line)"></textarea>
+        <label for="url-input">URLs or magnet links</label>
+        <textarea id="url-input" rows="5" placeholder="Paste one per line: https://… or magnet:?xt=urn:btih:…"></textarea>
+        <div id="torrent-drop" class="torrent-drop" tabindex="0" role="button" aria-label="Choose .torrent files">
+          <i class="fas fa-magnet"></i>
+          <span><strong>Open .torrent files</strong> or drop them here</span>
+          <input type="file" id="torrent-input" accept=".torrent,application/x-bittorrent" multiple hidden>
+        </div>
+        <ul id="torrent-picked" class="torrent-picked hidden"></ul>
         <div id="url-error" class="error-msg hidden"></div>
         <label for="filename-input">Custom Filenames (optional, one per line, matching URL order)</label>
         <textarea id="filename-input" rows="3" placeholder="Leave blank to auto-detect filenames"></textarea>
@@ -62,65 +113,130 @@
   </div>
 
   <div id="settings-modal" class="modal-overlay hidden">
-    <div class="modal settings-modal">
-      <div class="modal-header">
-        <h2><i class="fas fa-gear"></i> Settings</h2>
-        <button class="modal-close" id="settings-close"><i class="fas fa-times"></i></button>
+    <div class="modal st-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <header class="st-header">
+        <div>
+          <h2 id="settings-title">Settings</h2>
+          <p class="st-subtitle">Changes take effect when you save</p>
+        </div>
+        <button type="button" class="modal-close" id="settings-close" aria-label="Close settings"><i class="fas fa-xmark"></i></button>
+      </header>
+
+      <div class="st-body">
+        <nav class="st-nav" aria-label="Settings sections">
+          <button type="button" class="st-nav-item active" data-tab="downloads" aria-current="page">
+            <span class="st-nav-icon"><i class="fas fa-download"></i></span><span>Downloads</span>
+          </button>
+          <button type="button" class="st-nav-item" data-tab="appearance">
+            <span class="st-nav-icon"><i class="fas fa-palette"></i></span><span>Appearance</span>
+          </button>
+          <button type="button" class="st-nav-item" data-tab="desktop" data-desktop-only hidden>
+            <span class="st-nav-icon"><i class="fas fa-desktop"></i></span><span>Desktop</span>
+          </button>
+        </nav>
+
+        <div class="st-panes">
+          <!-- Downloads -->
+          <section class="st-pane" data-pane="downloads">
+            <h3 class="st-pane-title">Downloads</h3>
+            <p class="st-pane-desc">How many transfers run at once and how they use bandwidth.</p>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-text">
+                  <label class="st-label" for="setting-concurrent">Simultaneous downloads</label>
+                  <p class="st-help">Files downloading at the same time (1–10)</p>
+                </div>
+                <div class="st-stepper">
+                  <button type="button" data-step="-1" data-for="setting-concurrent" aria-label="Decrease">&minus;</button>
+                  <input type="number" id="setting-concurrent" min="1" max="10" value="3" inputmode="numeric">
+                  <button type="button" data-step="1" data-for="setting-concurrent" aria-label="Increase">+</button>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-text">
+                  <label class="st-label" for="setting-connections">Connections per file</label>
+                  <p class="st-help">Large files are split across parallel connections (1 turns this off)</p>
+                </div>
+                <div class="st-stepper">
+                  <button type="button" data-step="-1" data-for="setting-connections" aria-label="Decrease">&minus;</button>
+                  <input type="number" id="setting-connections" min="1" max="32" value="8" inputmode="numeric">
+                  <button type="button" data-step="1" data-for="setting-connections" aria-label="Increase">+</button>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-text">
+                  <label class="st-label" for="setting-speed-limit">Speed limit</label>
+                  <p class="st-help">Total bandwidth for all downloads. <span id="setting-speed-label" class="st-accent-text">Unlimited</span></p>
+                </div>
+                <div class="st-stepper st-stepper-wide">
+                  <button type="button" data-step="-1" data-delta="256" data-for="setting-speed-limit" aria-label="Decrease by 256 KB/s">&minus;</button>
+                  <input type="number" id="setting-speed-limit" min="0" max="1000000" value="0" inputmode="numeric">
+                  <span class="st-unit">KB/s</span>
+                  <button type="button" data-step="1" data-delta="256" data-for="setting-speed-limit" aria-label="Increase by 256 KB/s">+</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Appearance -->
+          <section class="st-pane" data-pane="appearance" hidden>
+            <h3 class="st-pane-title">Appearance</h3>
+            <p class="st-pane-desc">Choose how the app looks. Applies everywhere, including the tray menu.</p>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-text">
+                  <span class="st-label" id="mode-label">Theme</span>
+                  <p class="st-help">Dark or light interface</p>
+                </div>
+                <div class="st-segment" role="radiogroup" aria-labelledby="mode-label">
+                  <button type="button" role="radio" data-mode-value="dark"><i class="fas fa-moon"></i> Dark</button>
+                  <button type="button" role="radio" data-mode-value="light"><i class="fas fa-sun"></i> Light</button>
+                </div>
+              </div>
+              <div class="st-row st-row-stack">
+                <div class="st-text">
+                  <span class="st-label" id="accent-label">Accent color</span>
+                  <p class="st-help">Used for buttons, progress and selection</p>
+                </div>
+                <div class="st-swatches" id="setting-accent-seg" role="radiogroup" aria-labelledby="accent-label"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Desktop (Tauri app only) -->
+          <section class="st-pane" data-pane="desktop" data-desktop-only hidden>
+            <h3 class="st-pane-title">Desktop</h3>
+            <p class="st-pane-desc">How the app behaves on your computer.</p>
+            <div class="st-group">
+              <label class="st-row st-row-action" for="setting-autostart">
+                <div class="st-text">
+                  <span class="st-label">Start at login</span>
+                  <p class="st-help">Open automatically when you sign in, hidden in the tray</p>
+                </div>
+                <span class="st-toggle"><input type="checkbox" id="setting-autostart" role="switch"><span class="st-track"></span></span>
+              </label>
+              <label class="st-row st-row-action" for="setting-close-to-tray">
+                <div class="st-text">
+                  <span class="st-label">Keep running in tray</span>
+                  <p class="st-help">Closing the window keeps downloads going in the background</p>
+                </div>
+                <span class="st-toggle"><input type="checkbox" id="setting-close-to-tray" role="switch"><span class="st-track"></span></span>
+              </label>
+            </div>
+          </section>
+        </div>
       </div>
-      <div class="modal-body">
-        <div class="setting-row">
-          <div class="setting-row-icon"><i class="fas fa-circle-half-stroke"></i></div>
-          <div class="setting-row-text">
-            <label>Mode</label>
-            <p>Dark or light appearance</p>
-          </div>
-          <div class="segmented" id="setting-mode-seg">
-            <button type="button" data-value="dark" title="Dark"><i class="fas fa-moon"></i></button>
-            <button type="button" data-value="light" title="Light"><i class="fas fa-sun"></i></button>
-          </div>
-          <input type="hidden" id="setting-mode" value="dark">
+
+      <footer class="st-footer">
+        <div class="st-status">
+          <p id="settings-hint" class="st-hint" hidden><i class="fas fa-circle"></i> Unsaved changes</p>
+          <p id="settings-error" class="st-error" hidden></p>
         </div>
-        <div class="setting-row">
-          <div class="setting-row-icon"><i class="fas fa-layer-group"></i></div>
-          <div class="setting-row-text">
-            <label for="setting-concurrent">Max Concurrent Downloads</label>
-            <p>How many files download at the same time</p>
-          </div>
-          <input type="number" id="setting-concurrent" min="1" max="10" value="3">
+        <div class="st-actions">
+          <button type="button" class="btn" id="settings-cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="settings-save"><i class="fas fa-check"></i> Save changes</button>
         </div>
-        <div class="setting-row">
-          <div class="setting-row-icon"><i class="fas fa-network-wired"></i></div>
-          <div class="setting-row-text">
-            <label for="setting-connections">Connections per Download</label>
-            <p>Split large files into parts downloaded in parallel (1 = off)</p>
-          </div>
-          <input type="number" id="setting-connections" min="1" max="32" value="8">
-        </div>
-        <div class="setting-row">
-          <div class="setting-row-icon"><i class="fas fa-gauge-high"></i></div>
-          <div class="setting-row-text">
-            <label for="setting-speed-limit">Global Speed Limit</label>
-            <p>0 means unlimited</p>
-          </div>
-          <div class="setting-input-wrap">
-            <input type="number" id="setting-speed-limit" min="0" value="0">
-            <span>KB/s</span>
-          </div>
-        </div>
-        <div class="setting-row">
-          <div class="setting-row-icon"><i class="fas fa-palette"></i></div>
-          <div class="setting-row-text">
-            <label>Color Theme</label>
-            <p>Pick an accent color</p>
-          </div>
-        </div>
-        <div class="theme-grid" id="setting-accent-seg"></div>
-        <input type="hidden" id="setting-accent" value="blue">
-      </div>
-      <div class="modal-footer settings-footer">
-        <button class="btn" id="settings-cancel">Cancel</button>
-        <button class="btn btn-primary" id="settings-save"><i class="fas fa-check"></i> Save Changes</button>
-      </div>
+      </footer>
     </div>
   </div>
 

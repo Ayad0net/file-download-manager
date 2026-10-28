@@ -10,10 +10,11 @@ from PIL import Image, ImageChops, ImageDraw
 SS = 4  # supersampling factor for anti-aliased edges
 W = 1024 * SS
 
-TILE = (47, 91, 234, 255)      # solid brand blue
-GLYPH = (255, 255, 255)        # white arrow, tray and ring
+TILE = (255, 255, 255, 255)    # white tile
+EDGE = (222, 227, 238, 255)    # hairline so the white tile stays visible on light backgrounds
+GLYPH = (47, 91, 234)          # brand blue arrow, tray and ring
 # Ring parts get solid tints (no transparency) so the icon stays flat on any background.
-PART_TINTS = [1.0, 0.82, 0.62, 0.42]
+PART_TINTS = [1.0, 0.72, 0.48, 0.28]
 
 
 def s(v):
@@ -21,7 +22,7 @@ def s(v):
 
 
 def tint(t):
-    """Solid colour between the tile blue (t=0) and white (t=1)."""
+    """Solid colour between the white tile (t=0) and brand blue (t=1)."""
     return tuple(int(TILE[i] + (GLYPH[i] - TILE[i]) * t) for i in range(3)) + (255,)
 
 
@@ -30,7 +31,7 @@ def main(out):
     d = ImageDraw.Draw(canvas)
 
     # Tile on the macOS icon grid: 824px body inside the 1024 canvas.
-    d.rounded_rectangle((s(100), s(100), s(924), s(924)), s(185), fill=TILE)
+    d.rounded_rectangle((s(100), s(100), s(924), s(924)), s(185), fill=TILE, outline=EDGE, width=s(5))
 
     # Segmented ring: four parts, a nod to multi-connection downloads.
     cx, cy, r, sw = 512, 492, 262, 34

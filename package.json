@@ -1,6 +1,6 @@
 {
   "name": "download-manager",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "Web-based file download manager",
   "type": "module",
   "scripts": {
@@ -8,17 +8,21 @@
     "start": "bun run backend/src/index.ts",
     "build": "tsc -p backend/tsconfig.json",
     "typecheck": "tsc --noEmit -p backend/tsconfig.json",
-    "build:sidecar": "bash scripts/build-sidecar.sh",
-    "vendor": "rm -rf frontend/vendor/fontawesome && mkdir -p frontend/vendor/fontawesome && cp -R node_modules/@fortawesome/fontawesome-free/css node_modules/@fortawesome/fontawesome-free/webfonts frontend/vendor/fontawesome/",
+    "build:sidecar": "bun scripts/build-sidecar.ts",
+    "vendor": "bun scripts/vendor.ts",
     "postinstall": "bun run vendor",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "version:bump": "bun scripts/bump-version.ts"
   },
   "dependencies": {
-    "sql.js": "^1.11.0",
     "hono": "^4.7.0",
-    "uuid": "^11.1.0"
+    "parse-torrent": "11.0.24",
+    "sql.js": "^1.11.0",
+    "uuid": "^11.1.0",
+    "webrtc-polyfill": "file:./stubs/webrtc-polyfill",
+    "webtorrent": "^3.0.21"
   },
   "devDependencies": {
     "@fortawesome/fontawesome-free": "6.5.1",
@@ -30,5 +34,8 @@
   },
   "trustedDependencies": [
     "sql.js"
-  ]
+  ],
+  "overrides": {
+    "webrtc-polyfill": "file:./stubs/webrtc-polyfill"
+  }
 }

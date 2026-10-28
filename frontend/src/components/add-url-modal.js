@@ -1,4 +1,4 @@
-import { addDownloads } from '../services/api.js';
+import { addDownloads, addTorrentFiles } from '../services/api.js';
 
 export function initAddUrlModal() {
   const modal = document.getElementById('add-url-modal');
@@ -8,9 +8,53 @@ export function initAddUrlModal() {
   const confirmBtn = document.getElementById('modal-confirm');
   const cancelBtn = document.getElementById('modal-cancel');
   const closeBtn = document.getElementById('modal-close');
+  const drop = document.getElementById('torrent-drop');
+  const fileInput = document.getElementById('torrent-input');
+  const pickedList = document.getElementById('torrent-picked');
+  let torrentFiles = [];
+
+  function renderPicked() {
+    pickedList.classList.toggle('hidden', torrentFiles.length === 0);
+    pickedList.innerHTML = torrentFiles.map((f, i) => `
+      <li><i class="fas fa-file"></i><span></span>
+        <button type="button" class="btn btn-sm btn-icon" data-remove="${i}" title="Remove"><i class="fas fa-xmark"></i></button>
+      </li>`).join('');
+    pickedList.querySelectorAll('li span').forEach((el, i) => { el.textContent = torrentFiles[i].name; });
+  }
+
+  function addPicked(files) {
+    const valid = [...files].filter(f => /\.torrent$/i.test(f.name));
+    if (valid.length < files.length) window.showToast?.('Only .torrent files can be added here', 'warning');
+    torrentFiles = torrentFiles.concat(valid);
+    renderPicked();
+  }
+
+  drop.onclick = () => fileInput.click();
+  drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } };
+  fileInput.onchange = () => { addPicked(fileInput.files); fileInput.value = ''; };
+  pickedList.onclick = (e) => {
+    const btn = e.target.closest('[data-remove]');
+    if (!btn) return;
+    torrentFiles.splice(+btn.dataset.remove, 1);
+    renderPicked();
+  };
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    drop.classList.add('dragging');
+  }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove('dragging')));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    // Desktop: Tauri reports native drops itself (window-guards.js adds them directly).
+    if (window.__TAURI__) return;
+    addPicked(e.dataTransfer.files);
+  });
 
   function close() {
     modal.classList.add('hidden');
+    torrentFiles = [];
+    renderPicked();
     urlInput.value = '';
     filenameInput.value = '';
     errorEl.classList.add('hidden');
@@ -26,8 +70,8 @@ export function initAddUrlModal() {
 
   confirmBtn.onclick = async () => {
     const raw = urlInput.value.trim();
-    if (!raw) {
-      errorEl.textContent = 'Please enter at least one URL';
+    if (!raw && torrentFiles.length === 0) {
+      errorEl.textContent = 'Enter a URL or magnet link, or choose a .torrent file';
       errorEl.classList.remove('hidden');
       return;
     }
@@ -37,6 +81,7 @@ export function initAddUrlModal() {
     const names = namesRaw ? namesRaw.split('\n').map(s => s.trim()).filter(Boolean) : undefined;
 
     const invalid = urls.filter(u => {
+      if (u.startsWith('magnet:')) return !/xt=urn:bt[im]h:/i.test(u);
       try {
         const p = new URL(u);
         return p.protocol !== 'http:' && p.protocol !== 'https:';
@@ -54,11 +99,16 @@ export function initAddUrlModal() {
     try {
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
-      const result = await addDownloads(urls, names);
-      if (result.errors && result.errors.length > 0) {
-        showToast(`Added ${result.downloads.length} downloads, ${result.errors.length} errors`, 'warning');
+      const results = [];
+      if (urls.length > 0) results.push(await addDownloads(urls, names));
+      if (torrentFiles.length > 0) results.push(await addTorrentFiles(torrentFiles));
+      const added = results.reduce((n, r) => n + (r.downloads?.length || 0), 0);
+      const errors = results.flatMap(r => r.details || r.errors || []);
+      if (added === 0) throw new Error(errors.join('; ') || 'Nothing could be added');
+      if (errors.length > 0) {
+        showToast(`Added ${added} download(s), ${errors.length} failed: ${errors[0]}`, 'warning');
       } else {
-        showToast(`Added ${result.downloads.length} download(s) to queue`, 'success');
+        showToast(`Added ${added} download(s) to queue`, 'success');
       }
       close();
     } catch (err) {
