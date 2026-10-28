@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Download Manager</title>
+  <link rel="icon" type="image/png" href="favicon.png">
   <script>
     (function () {
       var mode = localStorage.getItem('dm-mode');
@@ -15,6 +16,8 @@
       }
       document.documentElement.setAttribute('data-mode', mode);
       document.documentElement.setAttribute('data-accent', accent || 'blue');
+      // Applied before first paint so the collapsed sidebar doesn't flash open.
+      if (localStorage.getItem('dm-sidebar-collapsed') === '1') document.documentElement.classList.add('sidebar-collapsed');
       if (window.__TAURI_INTERNALS__ && /Mac/.test(navigator.platform)) document.documentElement.classList.add('tauri-mac');
     })();
   </script>
