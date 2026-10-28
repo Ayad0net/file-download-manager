@@ -2,6 +2,10 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.4.0 — 2026-10-28 (Minor)
+
+- GitHub release workflow for macOS, Windows and Linux; cross-platform build scripts
+
 ## 1.3.0 — 2026-10-28 (Minor)
 
 - Header logo now uses the app icon mark (inline SVG, follows accent color)

@@ -53,3 +53,18 @@ cd src-tauri && cargo build       # if Rust or tauri.conf.json changed
 
 Test behaviour against a running backend when you touch download logic
 (`PORT=… DATA_DIR=… DOWNLOAD_PATH=… bun backend/src/index.ts`), not just types.
+
+## Releasing
+
+`.github/workflows/release.yml` builds macOS (Apple Silicon + Intel), Windows x64 and
+Linux x64/ARM64 installers and attaches them to a **draft** GitHub Release. To release:
+
+```sh
+bun run version:bump minor "…"   # if not already bumped
+git commit -am "Release vX.Y.Z"
+git tag vX.Y.Z && git push && git push --tags
+```
+
+The tag must equal the `package.json` version or the workflow fails. Review the draft on
+GitHub, then publish it. Builds are unsigned (macOS Gatekeeper / Windows SmartScreen warn);
+add signing secrets to the workflow when certificates are available.

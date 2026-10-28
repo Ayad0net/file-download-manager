@@ -1,6 +1,6 @@
 {
   "name": "download-manager",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Web-based file download manager",
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "start": "bun run backend/src/index.ts",
     "build": "tsc -p backend/tsconfig.json",
     "typecheck": "tsc --noEmit -p backend/tsconfig.json",
-    "build:sidecar": "bash scripts/build-sidecar.sh",
-    "vendor": "rm -rf frontend/vendor/fontawesome && mkdir -p frontend/vendor/fontawesome && cp -R node_modules/@fortawesome/fontawesome-free/css node_modules/@fortawesome/fontawesome-free/webfonts frontend/vendor/fontawesome/",
+    "build:sidecar": "bun scripts/build-sidecar.ts",
+    "vendor": "bun scripts/vendor.ts",
     "postinstall": "bun run vendor",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
