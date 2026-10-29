@@ -75,6 +75,8 @@ function close() {
   menuEl = null;
 }
 
+export function openContextMenu(d, x, y) { open(d, x, y); }
+
 function open(d, x, y) {
   close();
   menuEl = document.createElement('div');

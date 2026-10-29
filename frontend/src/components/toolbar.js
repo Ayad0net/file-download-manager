@@ -2,29 +2,46 @@ import { pauseAll, resumeAll, stopAll, clearUncompleted } from '../services/api.
 import { store } from '../state/store.js';
 import { confirmAction } from './confirm-modal.js';
 
+const isMac = /Mac/.test(navigator.platform);
+
+const iconBtn = (id, icon, tip, enabled, extra = '') =>
+  `<button type="button" class="tb-icon${extra}" id="${id}" ${enabled ? '' : 'disabled'} data-tb-tip="${tip}" aria-label="${tip}"><i class="fas ${icon}"></i></button>`;
+
 export function renderToolbar(container) {
-  const { stats } = store;
-  const hasActive = store.downloads.some(d => d.status === 'downloading' || d.status === 'connecting');
+  const hasActive = store.downloads.some(d => d.status === 'downloading' || d.status === 'connecting' || d.status === 'queued');
   const hasPaused = store.downloads.some(d => d.status === 'paused');
   const uncompletedCount = store.downloads.filter(d => d.status !== 'completed').length;
 
-  container.innerHTML = `
-    <button class="btn btn-primary" id="toolbar-add" title="Add a new download URL"><i class="fas fa-plus"></i> Add URL</button>
-    <button class="btn" id="toolbar-pause-all" ${hasActive ? '' : 'disabled'} title="${hasActive ? 'Pause every active download' : 'No active downloads'}"><i class="fas fa-pause"></i> Pause All</button>
-    <button class="btn" id="toolbar-resume-all" ${hasPaused ? '' : 'disabled'} title="${hasPaused ? 'Resume every paused download' : 'No paused downloads'}"><i class="fas fa-play"></i> Resume All</button>
-    <button class="btn" id="toolbar-stop-all" ${hasActive ? '' : 'disabled'} title="${hasActive ? 'Stop every active download' : 'No active downloads'}"><i class="fas fa-stop"></i> Stop All</button>
-    <button class="btn btn-danger" id="toolbar-clear-all" ${uncompletedCount === 0 ? 'disabled' : ''} title="${uncompletedCount === 0 ? 'No uncompleted downloads' : 'Remove uncompleted entries and their files'}"><i class="fas fa-broom"></i> Clear Uncompleted</button>
-    <div class="toolbar-spacer"></div>
-    <div class="segmented" id="toolbar-view" role="group" aria-label="View">
-      <button type="button" data-view="list" class="${store.view === 'list' ? 'active' : ''}" title="List view" aria-pressed="${store.view === 'list'}"><i class="fas fa-list"></i></button>
-      <button type="button" data-view="cards" class="${store.view === 'cards' ? 'active' : ''}" title="Card view" aria-pressed="${store.view === 'cards'}"><i class="fas fa-grip"></i></button>
-      <button type="button" data-view="table" class="${store.view === 'table' ? 'active' : ''}" title="Table view" aria-pressed="${store.view === 'table'}"><i class="fas fa-table"></i></button>
-    </div>
-  `;
+  // Built once; later store updates only refresh the button states so the search box keeps focus.
+  if (!container.querySelector('#toolbar-search')) {
+    container.setAttribute('data-tauri-drag-region', '');
+    container.innerHTML = `
+      <button type="button" class="tb-icon tb-menu" id="toolbar-menu" aria-label="Menu"><i class="fas fa-bars"></i></button>
+      <button class="btn btn-primary tb-add" id="toolbar-add" title="Add a new download"><i class="fas fa-plus"></i> Add URL</button>
+      <div class="tb-group" id="toolbar-actions"></div>
+      <div class="toolbar-spacer" data-tauri-drag-region></div>
+      <label class="tb-search">
+        <i class="fas fa-magnifying-glass"></i>
+        <input type="search" id="toolbar-search" placeholder="Search downloads" autocomplete="off" spellcheck="false">
+        <kbd>${isMac ? '⌘K' : 'Ctrl K'}</kbd>
+      </label>
+      <button type="button" class="tb-icon" id="toolbar-settings" data-tb-tip="Settings" aria-label="Settings"><i class="fas fa-sliders"></i></button>
+    `;
+    const search = document.getElementById('toolbar-search');
+    search.value = store.search;
+    search.oninput = () => store.setSearch(search.value);
+    search.onkeydown = (e) => { if (e.key === 'Escape') { search.value = ''; store.setSearch(''); search.blur(); } };
+    document.getElementById('toolbar-settings').onclick = () => window.openSettings();
+    document.getElementById('toolbar-menu').onclick = () => document.getElementById('sidebar').classList.toggle('open');
+  }
 
-  document.querySelectorAll('#toolbar-view button').forEach(btn => {
-    btn.onclick = () => store.setView(btn.dataset.view);
-  });
+  document.getElementById('toolbar-actions').innerHTML = `
+    ${iconBtn('toolbar-resume-all', 'fa-play', 'Resume all', hasPaused)}
+    ${iconBtn('toolbar-pause-all', 'fa-pause', 'Pause all', hasActive)}
+    ${iconBtn('toolbar-stop-all', 'fa-stop', 'Stop all', hasActive)}
+    <span class="tb-sep"></span>
+    ${iconBtn('toolbar-clear-all', 'fa-broom', uncompletedCount ? 'Clear uncompleted' : 'No uncompleted downloads', uncompletedCount > 0, ' tb-danger')}
+  `;
 
   document.getElementById('toolbar-add').onclick = () => {
     document.getElementById('add-url-modal').classList.remove('hidden');
@@ -112,4 +129,11 @@ export function renderToolbar(container) {
 store.subscribe(() => {
   const container = document.getElementById('toolbar');
   if (container) renderToolbar(container);
+});
+
+document.addEventListener('keydown', (e) => {
+  if ((isMac ? e.metaKey : e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    document.getElementById('toolbar-search')?.focus();
+  }
 });

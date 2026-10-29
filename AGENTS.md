@@ -27,6 +27,7 @@ This updates every place the version lives and prepends an entry to `CHANGELOG.m
 - `src-tauri/tauri.conf.json`
 - `src-tauri/Cargo.toml`
 - `frontend/src/components/header.js` (`APP_VERSION`, shown in the app header)
+- `extension/manifest.json` (browser extension)
 
 Never edit these version strings by hand; if you add a new place that shows the version,
 add it to `scripts/bump-version.ts` and to the list above.
@@ -41,6 +42,11 @@ add it to `scripts/bump-version.ts` and to the list above.
   directly by Tauri (`frontendDist`). Desktop-only code checks `window.__TAURI__`.
 - `src-tauri/` Tauri shell: starts the backend sidecar, tray, file associations, autostart.
 - `stubs/webrtc-polyfill` disables native WebRTC so the backend compiles to one binary.
+- `extension/` browser extension (Manifest V3, one codebase for Chrome/Edge/Brave/Opera and
+  Firefox). Talks to the backend's HTTP API; caught downloads
+  wait in the app for confirmation (`routes/browser.ts`, `services/browser-requests.ts`). The app
+  serves the extension with its address (`app.json`) from Settings > Browser (Tauri bundles
+  `extension/` as a resource). `bun run extension:build` zips it into `dist/`.
 - `design/` icon render scripts (Pillow). Re-run them instead of editing PNGs by hand.
 
 ## Checks before finishing

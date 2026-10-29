@@ -22,9 +22,11 @@
     })();
   </script>
   <link rel="stylesheet" href="src/styles/style.css">
+  <link rel="stylesheet" href="src/styles/shell.css">
   <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css">
   <!-- Fetch the icon font and every module in parallel instead of discovering them import by import. -->
   <link rel="preload" href="vendor/fontawesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="vendor/fontawesome/webfonts/fa-brands-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="modulepreload" href="src/app.js">
   <link rel="modulepreload" href="src/components/add-url-modal.js">
   <link rel="modulepreload" href="src/components/confirm-modal.js">
@@ -35,7 +37,12 @@
   <link rel="modulepreload" href="src/components/logo.js">
   <link rel="modulepreload" href="src/components/settings-modal.js">
   <link rel="modulepreload" href="src/components/sidebar.js">
-  <link rel="modulepreload" href="src/components/stats-panel.js">
+  <link rel="modulepreload" href="src/components/page-head.js">
+  <link rel="modulepreload" href="src/components/browser-request-modal.js">
+  <link rel="modulepreload" href="src/components/browser-settings.js">
+  <link rel="modulepreload" href="src/components/extension-install.js">
+  <link rel="modulepreload" href="src/components/status-bar.js">
+  <link rel="modulepreload" href="src/components/media-modal.js">
   <link rel="modulepreload" href="src/components/toolbar.js">
   <link rel="modulepreload" href="src/services/api.js">
   <link rel="modulepreload" href="src/services/desktop-open.js">
@@ -46,44 +53,25 @@
 <body>
   <div id="app">
     <!-- Static app shell: painted immediately, replaced by the components once JS runs. -->
-    <header id="header">
-      <div class="header-logo">
-        <div class="logo-mark"><svg class="logo-svg" viewBox="0 0 100 100" aria-hidden="true"><rect x="0.75" y="0.75" width="98.5" height="98.5" rx="22" class="logo-tile"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M54.14 18.13A29.73 29.73 0 0 1 77.57 36.43" opacity="1"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M76.72 60.61A29.73 29.73 0 0 1 61.14 75.14" opacity="0.72"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M38.86 75.14A29.73 29.73 0 0 1 23.28 60.61" opacity="0.48"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="4.13" d="M21.72 38.38A29.73 29.73 0 0 1 42.81 18.72" opacity="0.28"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="7.04" d="M50.0 30.58V58.5"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="7.04" d="M37.86 47.57L50.0 59.71L62.14 47.57"/><rect x="36.65" y="66.99" width="26.7" height="5.34" rx="2.67" fill="currentColor"/></svg></div>
-        <div class="logo-text"><span class="logo-title">Download<em>Manager</em></span></div>
+    <aside id="sidebar">
+      <div class="nav-head"><span class="skeleton" style="width:120px;height:14px"></span></div>
+      <div class="nav-scroll">
+        <span class="skeleton skeleton-nav"></span>
+        <span class="skeleton skeleton-nav"></span>
+        <span class="skeleton skeleton-nav"></span>
+        <span class="skeleton skeleton-nav"></span>
+        <span class="skeleton skeleton-nav"></span>
       </div>
-    </header>
-    <div id="main-layout">
-      <aside id="sidebar">
-        <div class="nav-head"><span class="skeleton" style="width:56px;height:10px"></span></div>
-        <div class="nav-scroll">
-          <span class="skeleton skeleton-nav"></span>
-          <span class="skeleton skeleton-nav"></span>
-          <span class="skeleton skeleton-nav"></span>
-          <span class="skeleton skeleton-nav"></span>
-          <span class="skeleton skeleton-nav"></span>
-          <span class="skeleton skeleton-nav"></span>
-        </div>
-      </aside>
-      <main id="content">
-        <div id="toolbar">
-          <span class="skeleton skeleton-btn" style="width:104px"></span>
-          <span class="skeleton skeleton-btn"></span>
-          <span class="skeleton skeleton-btn"></span>
-          <span class="skeleton skeleton-btn"></span>
-        </div>
-        <div id="stats-panel">
-          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
-          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
-          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
-          <div class="stat-card skeleton-card"><span class="skeleton" style="width:40%;height:22px"></span><span class="skeleton" style="width:70%;height:10px"></span></div>
-        </div>
-        <div id="download-list"></div>
-        <footer id="footer">
-          Crafted with <i class="fas fa-heart"></i> by <strong>Ayad E. Korial</strong>
-        </footer>
-      </main>
-    </div>
-
+    </aside>
+    <main id="content">
+      <div id="toolbar">
+        <span class="skeleton skeleton-btn" style="width:104px"></span>
+        <span class="skeleton skeleton-btn" style="width:120px"></span>
+      </div>
+      <div id="page-head"></div>
+      <div id="download-list"></div>
+      <footer id="statusbar"></footer>
+    </main>
   </div>
 
   <div id="add-url-modal" class="modal-overlay hidden">
@@ -142,6 +130,55 @@
     </div>
   </div>
 
+  <div id="browser-request-modal" class="modal-overlay hidden">
+    <div class="modal br-modal" role="dialog" aria-modal="true" aria-labelledby="br-req-title">
+      <div class="modal-header">
+        <h2 id="br-req-title"><i class="fas fa-puzzle-piece"></i> New download</h2>
+        <span id="br-req-count" class="br-count"></span>
+      </div>
+      <div class="modal-body">
+        <div class="br-file">
+          <span class="file-icon" id="br-req-icon"><i class="fas fa-file"></i></span>
+          <div class="br-file-text">
+            <input id="br-req-name" class="br-name" spellcheck="false" aria-label="File name">
+            <div id="br-req-meta" class="br-meta"></div>
+          </div>
+        </div>
+        <div class="br-url" id="br-req-url"></div>
+        <label class="br-later"><input type="checkbox" id="br-req-paused"> Add paused (start later)</label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="br-req-cancel">Cancel</button>
+        <button class="btn btn-primary" id="br-req-start"><i class="fas fa-download"></i> Start download</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ext-install-modal" class="modal-overlay hidden">
+    <div class="modal ei-modal" role="dialog" aria-modal="true" aria-labelledby="ei-title">
+      <div class="modal-header">
+        <h2 id="ei-title"><i class="fas fa-puzzle-piece"></i> Install the browser extension</h2>
+        <button class="modal-close" id="ei-close" aria-label="Close"><i class="fas fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="ei-lead">With the extension, files you click in the browser open here so you can choose to download them.</p>
+        <div id="ei-pick">
+          <div class="ei-label">Choose your browser</div>
+          <div class="ei-browsers" id="ei-browsers"></div>
+        </div>
+        <div id="ei-steps" hidden>
+          <ol class="ei-list" id="ei-list"></ol>
+          <div class="ei-wait" id="ei-wait"><i class="fas fa-spinner fa-spin"></i> Waiting for the extension to connect…</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <label class="ei-never"><input type="checkbox" id="ei-never"> Don't ask again</label>
+        <button class="btn btn-secondary" id="ei-back" hidden>Back</button>
+        <button class="btn btn-secondary" id="ei-later">Later</button>
+      </div>
+    </div>
+  </div>
+
   <div id="settings-modal" class="modal-overlay hidden">
     <div class="modal st-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <header class="st-header">
@@ -159,6 +196,9 @@
           </button>
           <button type="button" class="st-nav-item" data-tab="appearance">
             <span class="st-nav-icon"><i class="fas fa-palette"></i></span><span>Appearance</span>
+          </button>
+          <button type="button" class="st-nav-item" data-tab="browser">
+            <span class="st-nav-icon"><i class="fas fa-puzzle-piece"></i></span><span>Browser</span>
           </button>
           <button type="button" class="st-nav-item" data-tab="desktop" data-desktop-only hidden>
             <span class="st-nav-icon"><i class="fas fa-desktop"></i></span><span>Desktop</span>
@@ -230,6 +270,36 @@
                 </div>
                 <div class="st-swatches" id="setting-accent-seg" role="radiogroup" aria-labelledby="accent-label"></div>
               </div>
+            </div>
+          </section>
+
+          <!-- Browser extension -->
+          <section class="st-pane" data-pane="browser" hidden>
+            <h3 class="st-pane-title">Browser</h3>
+            <p class="st-pane-desc">Send downloads, links and YouTube / TikTok videos from your browser to this app.</p>
+            <div class="st-group">
+              <div class="st-row">
+                <div class="st-text">
+                  <span class="st-label">Extension</span>
+                  <p class="st-help" id="br-status">Checking…</p>
+                </div>
+                <button type="button" class="btn btn-primary" id="br-get"><i class="fas fa-puzzle-piece"></i> Install extension</button>
+              </div>
+              <div class="st-row">
+                <div class="st-text">
+                  <span class="st-label">App address</span>
+                  <p class="st-help">Extensions from <i>Get extension</i> use it automatically; otherwise enter it in the extension's settings.</p>
+                  <code class="br-key" id="br-url">…</code>
+                </div>
+              </div>
+            </div>
+            <div class="br-steps">
+              <strong>Install</strong>
+              <ol>
+                <li><b>Chrome, Edge, Brave, Opera, Vivaldi:</b> unzip the file, open <code>chrome://extensions</code>, turn on <i>Developer mode</i>, click <i>Load unpacked</i> and choose the unzipped folder.</li>
+                <li><b>Firefox:</b> open <code>about:debugging#/runtime/this-firefox</code>, click <i>Load Temporary Add-on</i> and choose the zip.</li>
+              </ol>
+              <p>Every download you start in the browser then opens here for you to confirm.</p>
             </div>
           </section>
 

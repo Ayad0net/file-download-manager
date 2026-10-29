@@ -1,5 +1,6 @@
 import { API_BASE, pauseDownload, resumeDownload, stopDownload, retryDownload } from '../services/api.js';
-import { store } from '../state/store.js';
+import { store, CATEGORIES, categoryOf } from '../state/store.js';
+import { openContextMenu } from './context-menu.js';
 
 const opener = window.__TAURI__?.opener;
 // Torrents whose file panel is open; kept across re-renders.
@@ -31,8 +32,8 @@ export function renderDownloadList(container) {
     container.innerHTML = `
       <div class="download-empty">
         <i class="fas fa-download"></i>
-        <h3>No downloads yet</h3>
-        <p style="color:var(--text-muted);font-size:0.9rem">Add a URL to get started</p>
+        <h3>${store.downloads.length ? 'Nothing here' : 'No downloads yet'}</h3>
+        <p style="color:var(--text-muted);font-size:0.9rem">${store.downloads.length ? 'No downloads match this view' : 'Add a URL to get started'}</p>
       </div>
     `;
     return;
@@ -46,7 +47,6 @@ export function renderDownloadList(container) {
       <table class="download-table-view${draggable ? '' : ' is-sorted'}">
         <thead>
           <tr>
-            <th class="col-handle"></th>
             ${TABLE_COLUMNS.map(c => renderHeaderCell(c)).join('')}
             <th class="col-actions"></th>
           </tr>
@@ -157,12 +157,13 @@ function renderSegmentedBar(parts, total, progressClass) {
 const STATUS_RANK = { downloading: 0, connecting: 1, queued: 2, paused: 3, stopped: 4, failed: 5, completed: 6 };
 
 const TABLE_COLUMNS = [
-  { key: 'name', label: 'Name', value: d => d.filename.toLowerCase() },
-  { key: 'status', label: 'Status', value: d => STATUS_RANK[d.status] ?? 99 },
+  { key: 'name', label: 'Name', className: 'col-name', value: d => d.filename.toLowerCase() },
+  { key: 'size', label: 'Size', className: 'col-num col-size', value: d => d.totalBytes ?? d.downloadedBytes ?? 0 },
+  { key: 'status', label: 'Status', className: 'col-status', value: d => STATUS_RANK[d.status] ?? 99 },
   { key: 'progress', label: 'Progress', className: 'col-progress', value: d => d.progress || 0 },
-  { key: 'size', label: 'Size', value: d => d.totalBytes ?? d.downloadedBytes ?? 0 },
-  { key: 'speed', label: 'Speed', value: d => (d.status === 'downloading' ? d.speed || 0 : 0) },
-  { key: 'eta', label: 'Time left', value: d => d.remainingTime },
+  { key: 'speed', label: 'Speed', className: 'col-num', value: d => (d.status === 'downloading' ? d.speed || 0 : 0) },
+  { key: 'eta', label: 'Time left', className: 'col-num', value: d => d.remainingTime },
+  { key: 'added', label: 'Added', className: 'col-num col-added', value: d => d.createdAt },
 ];
 
 function sortDownloads(list, sort) {
@@ -199,32 +200,86 @@ document.addEventListener('click', (e) => {
   if (btn) store.toggleSort(btn.dataset.sort);
 });
 
+const STATUS_LABELS = {
+  downloading: ['Downloading', 'fa-circle-down'],
+  connecting: ['Connecting', 'fa-circle-notch'],
+  queued: ['Queued', 'fa-clock'],
+  paused: ['Paused', 'fa-circle-pause'],
+  stopped: ['Stopped', 'fa-circle-stop'],
+  completed: ['Completed', 'fa-circle-check'],
+  failed: ['Failed', 'fa-circle-exclamation'],
+};
+
+function hostOf(d) {
+  if (d.kind === 'torrent') return 'BitTorrent';
+  try { return new URL(d.url).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+
+function sublineOf(d) {
+  const cat = CATEGORIES.find(c => c.key === categoryOf(d));
+  const parts = [hostOf(d), cat?.label];
+  if (d.kind === 'media' && d.mediaQuality) parts.push(d.mediaQuality === 'audio' ? 'Audio' : /^\d+$/.test(d.mediaQuality) ? `${d.mediaQuality}p` : 'Best');
+  if (d.kind === 'torrent' && d.torrentFiles?.length > 1) parts.push(`${d.torrentFiles.length} files`);
+  return parts.filter(Boolean).join(' · ');
+}
+
+function formatAdded(iso) {
+  const t = new Date(iso);
+  if (isNaN(t)) return '—';
+  const time = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const day = new Date(); day.setHours(0, 0, 0, 0);
+  const diff = Math.floor((day - new Date(t).setHours(0, 0, 0, 0)) / 86400000);
+  if (diff === 0) return `Today ${time}`;
+  if (diff === 1) return `Yesterday ${time}`;
+  return t.toLocaleDateString([], { month: 'short', day: 'numeric', year: t.getFullYear() === day.getFullYear() ? undefined : 'numeric' });
+}
+
 function renderDownloadRow(d, draggable = true) {
   const status = d.status;
   const isActive = status === 'downloading' || status === 'connecting';
   const bar = renderProgressBar(d);
-  const pct = bar.indeterminate ? '—' : `${Math.round(d.progress || 0)}%`;
+  const cat = CATEGORIES.find(c => c.key === categoryOf(d));
+  const [label, icon] = STATUS_LABELS[status] || [status, 'fa-circle-question'];
+  const statusText = status === 'failed' && d.errorMessage ? d.errorMessage : label;
+  const pct = bar.indeterminate ? '—' : `${(d.progress || 0).toFixed(status === 'completed' ? 0 : 1)}%`;
+  const bytes = status === 'completed' || !d.totalBytes
+    ? formatBytes(d.totalBytes || d.downloadedBytes)
+    : `${formatBytes(d.downloadedBytes)} / ${formatBytes(d.totalBytes)}`;
   return `
-    <tr class="download-item download-row" data-id="${d.id}" draggable="${draggable}">
-      <td class="col-handle">${draggable ? '<span class="drag-handle"><i class="fas fa-grip-vertical"></i></span>' : ''}</td>
+    <tr class="download-item download-row row-${status}" data-id="${d.id}" draggable="${draggable}">
       <td class="col-name">
         <div class="row-name">
-          <i class="fas ${getStatusIcon(status)} row-icon status-${status}"></i>
+          <span class="file-icon cat-${cat?.key || 'other'}">${d.kind === 'torrent' ? '<i class="fas fa-magnet"></i>' : d.kind === 'media' ? '<i class="fab fa-youtube"></i>' : `<i class="fas ${cat?.icon || 'fa-file'}"></i>`}</span>
           <div class="row-name-text">
-            <div class="download-filename" title="${escapeHtml(d.filename)}">${d.kind === 'torrent' ? '<i class="fas fa-magnet torrent-mark" title="Torrent"></i>' : ''}${d.kind === 'media' ? '<i class="fab fa-youtube media-mark" title="Video"></i>' : ''}${escapeHtml(d.filename)}</div>
-            ${d.errorMessage ? `<div class="download-error" title="${escapeHtml(d.errorMessage)}">${escapeHtml(d.errorMessage)}</div>` : ''}
+            <div class="download-filename" title="${escapeHtml(d.filename)}">${escapeHtml(d.filename)}</div>
+            <div class="row-sub">${escapeHtml(sublineOf(d))}</div>
           </div>
         </div>
       </td>
-      <td><span class="download-status-badge badge-${status}">${status}</span></td>
-      <td class="col-progress"><div class="row-progress">${bar.html}<span>${pct}</span></div></td>
-      <td class="col-num">${formatBytes(d.downloadedBytes)} / ${d.totalBytes ? formatBytes(d.totalBytes) : '?'}</td>
-      <td class="col-num">${isActive ? formatSpeed(d.speed) : '—'}</td>
-      <td class="col-num">${isActive && !bar.indeterminate ? formatTime(d.remainingTime) : '—'}</td>
-      <td class="col-actions"><div class="download-actions">${renderActions(d)}</div></td>
+      <td class="col-num col-size">${d.totalBytes ? formatBytes(d.totalBytes) : '—'}</td>
+      <td class="col-status"><span class="row-status st-${status}" title="${escapeHtml(statusText)}"><i class="fas ${icon}"></i><span>${escapeHtml(statusText)}</span></span></td>
+      <td class="col-progress">
+        <div class="pg-top"><strong>${pct}</strong><span>${bytes}</span></div>
+        ${bar.html}
+      </td>
+      <td class="col-num">${isActive && d.speed ? formatSpeed(d.speed) : '—'}</td>
+      <td class="col-num">${isActive && !bar.indeterminate && d.remainingTime ? formatTime(d.remainingTime) : '—'}</td>
+      <td class="col-num col-added">${formatAdded(d.createdAt)}</td>
+      <td class="col-actions">
+        <div class="row-actions">${renderActions(d)}<button type="button" class="btn btn-sm btn-icon row-more" data-more="${d.id}" title="More" aria-label="More actions"><i class="fas fa-ellipsis"></i></button></div>
+      </td>
     </tr>
   `;
 }
+
+document.addEventListener('click', (e) => {
+  const more = e.target.closest('[data-more]');
+  if (!more) return;
+  e.stopPropagation();
+  const d = store.downloads.find(x => x.id === more.dataset.more);
+  const r = more.getBoundingClientRect();
+  if (d) openContextMenu(d, r.right - 200, r.bottom + 4);
+});
 
 function renderTorrentFiles(d) {
   const files = d.torrentFiles || [];

@@ -6,6 +6,8 @@ import fs from 'fs';
 import { initDatabase } from './database/db.js';
 import { streamSSE } from 'hono/streaming';
 import { downloadsApi, getSnapshot } from './routes/downloads.js';
+import { browserApi } from './routes/browser.js';
+import { uiConnected } from './services/browser-requests.js';
 import { getVersion } from './services/change-notifier.js';
 import { settingsApi } from './routes/settings.js';
 import { queueManager } from './services/queue-manager.js';
@@ -25,6 +27,8 @@ async function main() {
 
   // Live updates: push a snapshot whenever state changes (checked every 200ms), heartbeat otherwise.
   app.get('/api/events', (c) => streamSSE(c, async (stream) => {
+    uiConnected(1);
+    stream.onAbort(() => uiConnected(-1));
     let sent = -1;
     let idle = 0;
     while (!stream.aborted) {
@@ -40,6 +44,8 @@ async function main() {
       await stream.sleep(200);
     }
   }));
+
+  app.route('/api/browser', browserApi);
 
   app.get('/api/stats', (c) => {
     return c.json(queueManager.getStats());
@@ -91,3 +97,13 @@ async function main() {
 }
 
 main().catch(console.error);
+
+// Desktop sidecar: exit when the app shell is gone (crash, `tauri dev` restart), so an orphaned
+// backend never keeps the port and leaves the new shell without its backend.
+if (process.env.DM_DESKTOP === '1') {
+  const parent = process.ppid;
+  setInterval(() => {
+    try { process.kill(parent, 0); if (process.ppid === parent) return; } catch {}
+    process.exit(0);
+  }, 2000).unref();
+}

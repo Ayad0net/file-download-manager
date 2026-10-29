@@ -1,17 +1,20 @@
-import { store } from '../state/store.js';
+import { store, CATEGORIES } from '../state/store.js';
+import { brandHtml } from './header.js';
+import { toggleTheme } from './settings-modal.js';
+
+const library = [
+  { key: 'all', label: 'All downloads', icon: 'fa-table-cells-large' },
+  { key: 'unfinished', label: 'Unfinished', icon: 'fa-circle-down' },
+  { key: 'finished', label: 'Finished', icon: 'fa-circle-check' },
+];
 
 const sections = [
+  { items: library },
   {
-    items: [{ key: 'all', label: 'All Downloads', icon: 'fa-layer-group' }],
-  },
-  {
-    title: 'Status',
+    title: 'Categories',
     items: [
-      { key: 'downloading', label: 'Active', icon: 'fa-circle-down', tone: 'blue' },
-      { key: 'queued', label: 'Queued', icon: 'fa-clock', tone: 'muted' },
-      { key: 'paused', label: 'Paused', icon: 'fa-circle-pause', tone: 'yellow' },
-      { key: 'completed', label: 'Completed', icon: 'fa-circle-check', tone: 'green' },
-      { key: 'failed', label: 'Failed', icon: 'fa-circle-xmark', tone: 'red' },
+      ...CATEGORIES.map(c => ({ key: `category:${c.key}`, label: c.label, icon: c.icon })),
+      { key: 'torrents', label: 'Torrents', icon: 'fa-magnet' },
     ],
   },
 ];
@@ -49,8 +52,31 @@ function updateToggle() {
 }
 
 function getCount(key) {
-  if (key === 'all') return store.downloads.length;
-  return store.downloads.filter(d => d.status === key).length;
+  return store.downloads.filter(d => store.inScope(d, key)).length;
+}
+
+function formatSpeedParts(bps) {
+  if (!bps) return ['0', 'B/s'];
+  const units = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const i = Math.min(units.length - 1, Math.floor(Math.log(bps) / Math.log(1024)));
+  const v = bps / Math.pow(1024, i);
+  return [v.toFixed(i > 0 && v < 100 ? 1 : 0), units[i]];
+}
+
+// Area chart of the last minute of total speed.
+function sparkline(samples) {
+  const w = 200, h = 44;
+  if (samples.length < 2) return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"></svg>`;
+  const max = Math.max(...samples, 1);
+  const step = w / (samples.length - 1);
+  const pts = samples.map((v, i) => `${(i * step).toFixed(1)},${(h - 2 - (v / max) * (h - 6)).toFixed(1)}`);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--accent-blue)" stop-opacity="0.35"/><stop offset="1" stop-color="var(--accent-blue)" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="M0,${h} L${pts.join(' L')} L${w},${h} Z" fill="url(#spark-fill)"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent-blue)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+  </svg>`;
 }
 
 function formatBytes(bytes) {
@@ -63,7 +89,7 @@ function formatBytes(bytes) {
 function renderItem(item) {
   const count = getCount(item.key);
   return `
-    <button type="button" class="nav-item${store.filter === item.key ? ' active' : ''}" data-filter="${item.key}" data-tip="${item.label}"${item.tone ? ` data-tone="${item.tone}"` : ''}>
+    <button type="button" class="nav-item${store.scope === item.key ? ' active' : ''}" data-filter="${item.key}" data-tip="${item.label}"${item.tone ? ` data-tone="${item.tone}"` : ''}>
       <span class="nav-icon"><i class="fas ${item.icon}"></i></span>
       <span class="nav-label">${item.label}</span>
       <span class="nav-count"${count ? '' : ' data-zero'}>${count}</span>
@@ -81,9 +107,10 @@ function storageText() {
 
 export function renderSidebar(container) {
   container.setAttribute('aria-label', 'Download filters');
+  const isDark = (document.documentElement.getAttribute('data-mode') || 'dark') === 'dark';
   container.innerHTML = `
-    <div class="nav-head">
-      <span class="nav-head-title">Library</span>
+    <div class="nav-head" data-tauri-drag-region>
+      ${brandHtml()}
       <button type="button" class="nav-toggle" id="sidebar-collapse">${PANEL_ICON}</button>
     </div>
     <nav class="nav-scroll">
@@ -94,22 +121,28 @@ export function renderSidebar(container) {
         </div>
       `).join('')}
     </nav>
-    <div class="nav-foot" id="nav-storage" data-tip="">
-      <span class="nav-icon"><i class="fas fa-hard-drive"></i></span>
-      <div class="nav-storage-text">
-        <div class="nav-storage-free"><strong></strong> free</div>
-        <div class="nav-storage-used"></div>
-      </div>
+    <div class="speed-card" id="speed-card" data-tip="">
+      <div class="speed-card-head"><span>Total speed</span><span class="speed-active"></span></div>
+      <div class="speed-value"><strong></strong> <small></small></div>
+      <div class="speed-chart"></div>
+      <div class="speed-foot"><span class="speed-limit"></span><span class="speed-peak"></span></div>
+    </div>
+    <div class="nav-bottom">
+      <span class="nav-storage" id="nav-storage"><i class="fas fa-hard-drive"></i> <span></span></span>
+      <button type="button" class="nav-icon-btn" id="header-theme-btn" data-tip="Toggle theme" aria-label="Toggle theme"><i class="fas fa-${isDark ? 'moon' : 'sun'}"></i></button>
+      <button type="button" class="nav-icon-btn" id="sidebar-settings" data-tip="Settings" aria-label="Settings"><i class="fas fa-gear"></i></button>
     </div>
   `;
 
   container.querySelectorAll('.nav-item').forEach(el => {
     el.onclick = () => {
-      store.setFilter(el.dataset.filter);
+      store.setScope(el.dataset.filter);
       container.classList.remove('open'); // close the mobile drawer
     };
   });
   document.getElementById('sidebar-collapse').onclick = toggleSidebarCollapsed;
+  document.getElementById('header-theme-btn').onclick = () => toggleTheme();
+  document.getElementById('sidebar-settings').onclick = () => window.openSettings();
   updateToggle();
   updateSidebar();
 }
@@ -118,19 +151,33 @@ function updateSidebar() {
   const container = document.getElementById('sidebar');
   if (!container) return;
   container.querySelectorAll('.nav-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.filter === store.filter);
-    el.toggleAttribute('aria-current', el.dataset.filter === store.filter);
+    el.classList.toggle('active', el.dataset.filter === store.scope);
+    el.toggleAttribute('aria-current', el.dataset.filter === store.scope);
     const badge = el.querySelector('.nav-count');
     const count = getCount(el.dataset.filter);
     badge.textContent = count;
     badge.toggleAttribute('data-zero', !count);
   });
+
+  const card = document.getElementById('speed-card');
+  if (card) {
+    const [v, unit] = formatSpeedParts(store.totalSpeed());
+    const active = store.stats.active || 0;
+    card.querySelector('.speed-value strong').textContent = v;
+    card.querySelector('.speed-value small').textContent = unit;
+    const pill = card.querySelector('.speed-active');
+    pill.textContent = `${active} active`;
+    pill.hidden = !active;
+    card.querySelector('.speed-chart').innerHTML = sparkline(store.speedHistory);
+    card.querySelector('.speed-limit').innerHTML = `<i class="fas fa-gauge"></i> Limit ${store.globalSpeedLimit ? formatSpeedParts(store.globalSpeedLimit).join(' ') : 'Off'}`;
+    card.querySelector('.speed-peak').textContent = `Peak ${formatSpeedParts(store.peakSpeed).join(' ')}`;
+    card.dataset.tip = `${v} ${unit} · ${active} active`;
+  }
   const { used, free } = storageText();
-  const foot = document.getElementById('nav-storage');
-  if (foot) {
-    foot.querySelector('strong').textContent = free;
-    foot.querySelector('.nav-storage-used').textContent = `${used} downloaded`;
-    foot.dataset.tip = `${free} free · ${used} downloaded`;
+  const storage = document.getElementById('nav-storage');
+  if (storage) {
+    storage.querySelector('span').textContent = `${free} free`;
+    storage.title = `${free} free · ${used} downloaded`;
   }
 }
 

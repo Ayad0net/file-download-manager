@@ -1,38 +1,15 @@
 import { LOGO_SVG } from './logo.js';
-import { store } from '../state/store.js';
-import { toggleTheme } from './settings-modal.js';
 
-const APP_VERSION = 'v1.5.1';
+const APP_VERSION = 'v1.12.2';
 
-export function renderHeader(container) {
-  // Let the header act as the window's title bar in the desktop app.
-  container.setAttribute('data-tauri-drag-region', '');
-  const isDark = (document.documentElement.getAttribute('data-mode') || 'dark') === 'dark';
-  container.innerHTML = `
-    <button id="sidebar-toggle"><i class="fas fa-bars"></i></button>
-    <div class="header-logo">
+/** App name and version at the top of the sidebar. */
+export function brandHtml() {
+  return `
+    <div class="brand" data-tauri-drag-region>
       <div class="logo-mark">${LOGO_SVG}</div>
-      <div class="logo-text">
-        <span class="logo-title">Download<em>Manager</em></span>
-        <span class="logo-version">${APP_VERSION}</span>
-      </div>
-    </div>
-    <div class="header-spacer" data-tauri-drag-region></div>
-    <div class="header-controls">
-      <button class="btn btn-icon" id="header-settings-btn" title="Settings"><i class="fas fa-gear"></i></button>
-      <button class="btn btn-icon" id="header-theme-btn" title="Toggle Theme"><i class="fas fa-${isDark ? 'moon' : 'sun'}"></i></button>
-    </div>
-  `;
-
-  document.getElementById('sidebar-toggle').onclick = () => {
-    document.getElementById('sidebar').classList.toggle('open');
-  };
-
-  document.getElementById('header-settings-btn').onclick = () => {
-    window.openSettings();
-  };
-
-  document.getElementById('header-theme-btn').onclick = () => {
-    toggleTheme();
-  };
+      <span class="brand-text" data-tauri-drag-region>
+        <span class="brand-name">Download Manager</span>
+        <span class="brand-version">${APP_VERSION}</span>
+      </span>
+    </div>`;
 }

@@ -38,6 +38,7 @@ function replaceOnce(rel: string, pattern: RegExp, replacement: string) {
 replaceOnce('package.json', /"version": "[^"]+"/, `"version": "${next}"`);
 replaceOnce('src-tauri/tauri.conf.json', /"version": "[^"]+"/, `"version": "${next}"`);
 replaceOnce('src-tauri/Cargo.toml', /^version = "[^"]+"/m, `version = "${next}"`);
+replaceOnce('extension/manifest.json', /"version": "[^"]+"/, `"version": "${next}"`);
 replaceOnce('frontend/src/components/header.js', /const APP_VERSION = 'v[^']+'/, `const APP_VERSION = 'v${next}'`);
 
 const changelog = file('CHANGELOG.md');

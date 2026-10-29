@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/32.png" alt="" width="22" height="22">
+    <strong>Download Manager</strong>
+    <span id="conn" class="conn">Checking…</span>
+    <button id="settings-btn" class="icon" title="Settings" aria-label="Settings">⚙</button>
+  </header>
+
+  <section id="offline" class="card hidden">
+    <p><b>The app isn't reachable.</b> Start Download Manager, or check the app address in settings.</p>
+    <button id="retry" class="btn">Try again</button>
+  </section>
+
+  <section id="media" class="card hidden">
+    <div class="media-head">
+      <img id="thumb" class="thumb hidden" alt="">
+      <div>
+        <div id="title" class="title"></div>
+        <div id="meta" class="meta"></div>
+      </div>
+    </div>
+    <div id="media-loading" class="meta">Reading available qualities…</div>
+    <div id="qualities" class="qualities" role="radiogroup"></div>
+    <label id="playlist-wrap" class="check hidden"><input type="checkbox" id="whole-playlist" checked> <span id="playlist-label"></span></label>
+    <button id="media-dl" class="btn primary" disabled>Download</button>
+  </section>
+
+  <section id="quick" class="card hidden">
+    <label for="url">Add links</label>
+    <textarea id="url" rows="2" placeholder="Paste URLs, one per line"></textarea>
+    <button id="add-url" class="btn primary">Add to queue</button>
+    <label class="check"><input type="checkbox" id="intercept"> Capture browser downloads</label>
+  </section>
+
+  <section id="settings" class="card hidden">
+    <label for="server">App address</label>
+    <input id="server" type="url" placeholder="http://127.0.0.1:17890">
+    <p class="hint">Desktop app: <code>http://127.0.0.1:17890</code>. Web / Docker: the address you open it at, e.g. <code>http://localhost:8080</code>.</p>
+    <label for="mode">Send to the app</label>
+    <select id="mode">
+      <option value="all">Every browser download</option>
+      <option value="filtered">Only the file types below, or files larger than the size limit</option>
+    </select>
+    <label for="min-size">Size limit (MB)</label>
+    <input id="min-size" type="number" min="0" step="1">
+    <label for="exts">Always capture these file types</label>
+    <textarea id="exts" rows="5"></textarea>
+    <p class="hint">Used in the second mode. Video, audio, images, documents, apps, archives and disk images are included by default. Clear the box to restore the full list.</p>
+    <div class="row"><button id="save" class="btn primary">Save</button><button id="back" class="btn">Back</button></div>
+  </section>
+
+  <p id="msg" class="msg hidden"></p>
+  <script src="formats.js"></script>
+  <script src="quality.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

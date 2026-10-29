@@ -1,9 +1,10 @@
 import { setMaxConcurrent, setSpeedLimit, setConnections } from '../services/api.js';
 import { store } from '../state/store.js';
 import { confirmAction } from './confirm-modal.js';
+import { initBrowserSettings, loadBrowserPane } from './browser-settings.js';
 
 const ACCENTS = [
-  { value: 'blue', name: 'Slate', color: '#3b82f6' },
+  { value: 'blue', name: 'Indigo', color: '#6366f1' },
   { value: 'ocean', name: 'Ocean', color: '#0ea5e9' },
   { value: 'forest', name: 'Forest', color: '#22c55e' },
   { value: 'violet', name: 'Violet', color: '#8b5cf6' },
@@ -30,6 +31,17 @@ export function applyTheme(mode, accent) {
   localStorage.setItem('dm-accent', accent || 'blue');
   const icon = document.getElementById('header-theme-btn')?.querySelector('i');
   if (icon) icon.className = mode === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+  syncWindowBackground();
+  setTimeout(syncWindowBackground, THEME_FADE_MS + 50); // after the fade
+}
+
+/** Desktop: the native window background shows at the rounded corners; keep it on the theme. */
+export function syncWindowBackground() {
+  const win = window.__TAURI__?.window?.getCurrentWindow?.();
+  if (!win?.setBackgroundColor) return;
+  const color = getComputedStyle(document.body).backgroundColor;
+  const [r, g, b] = (color.match(/\d+/g) || []).map(Number);
+  if (r !== undefined) win.setBackgroundColor([r, g, b, 255]).catch(() => {});
 }
 
 export function toggleTheme() {
@@ -96,6 +108,8 @@ export function initSettingsModal() {
   const autostartInput = document.getElementById('setting-autostart');
   const closeToTrayInput = document.getElementById('setting-close-to-tray');
 
+  initBrowserSettings();
+
   // Desktop-only rows and tabs stay hidden in the web version.
   modal.querySelectorAll('[data-desktop-only]').forEach(el => { el.hidden = !tauri?.core; });
 
@@ -135,6 +149,7 @@ export function initSettingsModal() {
       else t.removeAttribute('aria-current');
     });
     panes.forEach(p => { p.hidden = p.dataset.pane !== name; });
+    if (name === 'browser') loadBrowserPane();
   }
 
   function close() {
@@ -155,7 +170,7 @@ export function initSettingsModal() {
     close();
   }
 
-  window.openSettings = async () => {
+  window.openSettings = async (tab = 'downloads') => {
     numberFields[0].value = store.maxConcurrent;
     numberFields[1].value = store.connectionsPerDownload;
     speedInput.value = Math.round((store.globalSpeedLimit || 0) / 1024);
@@ -174,7 +189,7 @@ export function initSettingsModal() {
 
     initial = snapshot();
     errorEl.hidden = true;
-    showTab('downloads');
+    showTab(typeof tab === 'string' ? tab : 'downloads');
     refresh();
     modal.classList.remove('hidden');
     dialog.classList.remove('animating');

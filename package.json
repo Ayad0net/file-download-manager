@@ -1,6 +1,6 @@
 {
   "name": "download-manager",
-  "version": "1.5.1",
+  "version": "1.12.2",
   "description": "Web-based file download manager",
   "type": "module",
   "scripts": {
@@ -14,7 +14,8 @@
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build",
-    "version:bump": "bun scripts/bump-version.ts"
+    "version:bump": "bun scripts/bump-version.ts",
+    "extension:build": "bun scripts/build-extension.ts"
   },
   "dependencies": {
     "hono": "^4.7.0",

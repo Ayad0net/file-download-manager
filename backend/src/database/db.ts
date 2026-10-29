@@ -66,6 +66,9 @@ export async function initDatabase(): Promise<SqlJsDatabase> {
     )
   `);
 
+  // Pairing keys were removed in 1.10.
+  db.run("DELETE FROM settings WHERE key = 'pairing_key'");
+
   save();
   return db;
 }

@@ -3,14 +3,36 @@ import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import parseTorrent, { toMagnetURI } from 'parse-torrent';
+import { markChanged } from '../services/change-notifier.js';
+import { listRequests } from '../services/browser-requests.js';
 import { queueManager, DOWNLOADS_DIR, TORRENTS_DIR } from '../services/queue-manager.js';
 import { isTorrentSource } from '../services/torrent-manager.js';
 import { probeMedia, isMediaUrl, mediaToolsStatus } from '../services/media-downloader.js';
 
 const downloadsApi = new Hono();
 
+// Browser extension heartbeat (in memory): it pings every 30s while the browser is open.
+let browserSeen: { at: number; name: string } | null = null;
+export function markBrowserSeen(name: string) {
+  const wasConnected = isBrowserConnected();
+  browserSeen = { at: Date.now(), name: name.slice(0, 40) };
+  if (!wasConnected) markChanged();
+  // Push a fresh snapshot once the heartbeat lapses, so the UI shows "disconnected".
+  clearTimeout(browserTimer);
+  browserTimer = setTimeout(markChanged, 76_000);
+}
+let browserTimer: ReturnType<typeof setTimeout> | undefined;
+function isBrowserConnected() {
+  return !!browserSeen && Date.now() - browserSeen.at < 75_000;
+}
+export function browserStatus() {
+  return isBrowserConnected() ? { connected: true, name: browserSeen!.name } : { connected: false, name: null };
+}
+
 export function getSnapshot() {
   return {
+    browser: browserStatus(),
+    browserRequests: listRequests(),
     downloads: queueManager.getAll(),
     stats: queueManager.getStats(),
     globalSpeedLimit: queueManager.getGlobalSpeedLimit(),

@@ -8,7 +8,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, WindowEvent};
 use tauri_plugin_autostart::MacosLauncher;
-use tauri_plugin_shell::{process::CommandChild, ShellExt};
+use tauri_plugin_shell::{process::{CommandChild, CommandEvent}, ShellExt};
 
 /// Must match API_BASE in frontend/src/services/api.js.
 const BACKEND_PORT: &str = "17890";
@@ -87,11 +87,39 @@ fn torrent_paths<I: IntoIterator<Item = String>>(args: I) -> Vec<PathBuf> {
         .collect()
 }
 
+/// Browser extension files: bundled as a resource; `tauri dev` doesn't copy resources, so
+/// debug builds fall back to the repo's extension/ folder.
+fn extension_dir(app: &AppHandle) -> PathBuf {
+    let bundled = app.path().resource_dir().map(|d| d.join("extension")).unwrap_or_default();
+    if cfg!(debug_assertions) && !bundled.join("manifest.json").exists() {
+        return PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join("extension");
+    }
+    bundled
+}
+
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
+        // macOS: join every Space so the window appears on the one the user is on, instead of
+        // staying (invisible) on the Space it was last shown on. Float it above the app the
+        // user is in (set_focus alone may leave it behind), then undo both once it is up.
+        #[cfg(target_os = "macos")]
+        let _ = window.set_visible_on_all_workspaces(true);
+        let _ = window.set_always_on_top(true);
         let _ = window.show();
         let _ = window.set_focus();
+        let handle = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(800));
+            let h = handle.clone();
+            let _ = handle.run_on_main_thread(move || {
+                if let Some(window) = h.get_webview_window("main") {
+                    let _ = window.set_always_on_top(false);
+                    #[cfg(target_os = "macos")]
+                    let _ = window.set_visible_on_all_workspaces(false);
+                }
+            });
+        });
     }
 }
 
@@ -220,7 +248,7 @@ fn main() {
             std::fs::create_dir_all(&data_dir)?;
             std::fs::create_dir_all(&download_dir)?;
 
-            let (_rx, child) = app
+            let (mut rx, child) = app
                 .shell()
                 .sidecar("dm-backend")?
                 .env("PORT", BACKEND_PORT)
@@ -228,9 +256,23 @@ fn main() {
                 .env("DOWNLOAD_PATH", &download_dir)
                 // Enables adding torrents by local file path (desktop only).
                 .env("DM_DESKTOP", "1")
+                // Browser extension files, zipped by the backend for Settings > Browser.
+                .env("DM_EXTENSION_DIR", extension_dir(app.handle()))
                 .current_dir(&data_dir)
                 .spawn()?;
             app.manage(Backend(Mutex::new(Some(child))));
+            // The backend asks for the window (e.g. a browser download waiting for confirmation).
+            let events_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(event) = rx.recv().await {
+                    if let CommandEvent::Stdout(line) = event {
+                        if String::from_utf8_lossy(&line).trim() == "DM_EVENT:show-window" {
+                            let h = events_handle.clone();
+                            let _ = events_handle.run_on_main_thread(move || show_main_window(&h));
+                        }
+                    }
+                }
+            });
             app.manage(Prefs(Mutex::new(load_prefs(app.handle()))));
 
             let tray = build_tray(app.handle())?;
