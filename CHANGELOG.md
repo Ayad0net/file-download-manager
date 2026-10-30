@@ -2,6 +2,10 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.13.1 — 2026-10-30 (Hotfix)
+
+- Launch at login starts in the tray only, without a Dock icon or taskbar button
+
 ## 1.13.0 — 2026-10-30 (Minor)
 
 - Setting to hide the app from the Dock/taskbar when closed to the tray

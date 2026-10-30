@@ -848,7 +848,7 @@ dependencies = [
 
 [[package]]
 name = "download-manager"
-version = "1.13.0"
+version = "1.13.1"
 dependencies = [
  "serde",
  "serde_json",

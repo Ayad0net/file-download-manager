@@ -298,6 +298,10 @@ fn main() {
             // UI has painted; a login launch stays in the tray.
             let autostarted = std::env::args().any(|a| a == AUTOSTART_ARG);
             app.manage(Startup { reveal_on_ready: !autostarted, revealed: AtomicBool::new(false) });
+            if autostarted {
+                // Tray only: no Dock icon / taskbar button until the window is opened.
+                set_dock_visible(app.handle(), false);
+            }
             // Safety net: never leave the user without a window if the UI fails to report ready.
             let handle = app.handle().clone();
             std::thread::spawn(move || {
