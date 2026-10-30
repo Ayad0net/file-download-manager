@@ -24,15 +24,30 @@ struct PendingTorrents(Mutex<Vec<String>>);
 
 /// Desktop-only preferences, kept by the shell because they act before/without the UI.
 #[derive(serde::Serialize, serde::Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 struct DesktopPrefs {
     /// Closing the window hides it to the tray so downloads keep running.
     close_to_tray: bool,
+    /// While hidden to the tray, also drop the Dock icon (macOS) / taskbar button.
+    hide_from_dock: bool,
 }
 
 impl Default for DesktopPrefs {
     fn default() -> Self {
-        Self { close_to_tray: true }
+        Self { close_to_tray: true, hide_from_dock: false }
+    }
+}
+
+/// Shows or removes the app's Dock icon (macOS) and taskbar button (Windows/Linux).
+fn set_dock_visible(app: &AppHandle, visible: bool) {
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(if visible {
+        tauri::ActivationPolicy::Regular
+    } else {
+        tauri::ActivationPolicy::Accessory
+    });
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_skip_taskbar(!visible);
     }
 }
 
@@ -98,6 +113,7 @@ fn extension_dir(app: &AppHandle) -> PathBuf {
 }
 
 fn show_main_window(app: &AppHandle) {
+    set_dock_visible(app, true);
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         // macOS: join every Space so the window appears on the one the user is on, instead of
@@ -296,10 +312,13 @@ fn main() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                let close_to_tray = window.app_handle().state::<Prefs>().0.lock().unwrap().close_to_tray;
-                if close_to_tray {
+                let prefs = window.app_handle().state::<Prefs>().0.lock().unwrap().clone();
+                if prefs.close_to_tray {
                     api.prevent_close();
                     let _ = window.hide();
+                    if prefs.hide_from_dock {
+                        set_dock_visible(window.app_handle(), false);
+                    }
                 }
             }
         })

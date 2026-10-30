@@ -1,6 +1,6 @@
 import { LOGO_SVG } from './logo.js';
 
-const APP_VERSION = 'v1.12.2';
+const APP_VERSION = 'v1.13.0';
 
 /** App name and version at the top of the sidebar. */
 export function brandHtml() {

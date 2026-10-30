@@ -2,6 +2,10 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.13.0 — 2026-10-30 (Minor)
+
+- Setting to hide the app from the Dock/taskbar when closed to the tray
+
 ## 1.12.2 — 2026-10-29 (Hotfix)
 
 - macOS: panel corners match the window's rounded corner

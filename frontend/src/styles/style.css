@@ -2055,3 +2055,8 @@ a:focus-visible,
 .media-entries li label span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-entries li label small { color: var(--text-muted); }
 .media-mark { color: var(--accent-red); font-size: 0.8em; margin-right: 6px; }
+
+.st-row.is-disabled {
+  opacity: 0.5;
+  cursor: default;
+}

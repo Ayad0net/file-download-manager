@@ -77,15 +77,15 @@ async function loadDesktop() {
     tauri.core.invoke('plugin:autostart|is_enabled'),
     tauri.core.invoke('get_desktop_prefs'),
   ]);
-  return { autostart, closeToTray: prefs.closeToTray };
+  return { autostart, closeToTray: prefs.closeToTray, hideFromDock: prefs.hideFromDock };
 }
 
-async function saveDesktop({ autostart, closeToTray }) {
+async function saveDesktop({ autostart, closeToTray, hideFromDock }) {
   const enabled = await tauri.core.invoke('plugin:autostart|is_enabled');
   if (enabled !== autostart) {
     await tauri.core.invoke(`plugin:autostart|${autostart ? 'enable' : 'disable'}`);
   }
-  await tauri.core.invoke('set_desktop_prefs', { prefs: { closeToTray } });
+  await tauri.core.invoke('set_desktop_prefs', { prefs: { closeToTray, hideFromDock } });
 }
 
 export function initSettingsModal() {
@@ -107,6 +107,14 @@ export function initSettingsModal() {
   ];
   const autostartInput = document.getElementById('setting-autostart');
   const closeToTrayInput = document.getElementById('setting-close-to-tray');
+  const hideFromDockInput = document.getElementById('setting-hide-from-dock');
+  const hideFromDockRow = hideFromDockInput.closest('.st-row');
+  // Hiding from the Dock/taskbar only applies when closing keeps the app in the tray.
+  const syncHideFromDock = () => {
+    hideFromDockInput.disabled = !closeToTrayInput.checked;
+    hideFromDockRow.classList.toggle('is-disabled', !closeToTrayInput.checked);
+  };
+  closeToTrayInput.addEventListener('change', syncHideFromDock);
 
   initBrowserSettings();
 
@@ -129,6 +137,7 @@ export function initSettingsModal() {
     ...numberFields.map(f => f.value),
     autostartInput.checked,
     closeToTrayInput.checked,
+    hideFromDockInput.checked,
     mode,
     accent,
   ]);
@@ -182,6 +191,8 @@ export function initSettingsModal() {
         const desktop = await loadDesktop();
         autostartInput.checked = desktop.autostart;
         closeToTrayInput.checked = desktop.closeToTray;
+        hideFromDockInput.checked = desktop.hideFromDock;
+        syncHideFromDock();
       } catch (err) {
         console.error('Failed to load desktop settings', err);
       }
@@ -254,7 +265,11 @@ export function initSettingsModal() {
       await setConnections(connections);
       await setSpeedLimit(speedKb * 1024);
       if (tauri?.core) {
-        await saveDesktop({ autostart: autostartInput.checked, closeToTray: closeToTrayInput.checked });
+        await saveDesktop({
+          autostart: autostartInput.checked,
+          closeToTray: closeToTrayInput.checked,
+          hideFromDock: hideFromDockInput.checked,
+        });
       }
       applyTheme(mode, accent);
       initial = snapshot();
